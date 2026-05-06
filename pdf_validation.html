@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Irancell — Validate PM Report</title>
+  <script src="./js/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "./js/pdf.worker.min.js";</script>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --gold:#FFCC00; --gold-dark:#997301; --gold-mid:#FFD700;
+      --gold-light:#FCE068; --white:#ffffff;
+      --shadow:0 2px 12px rgba(0,0,0,.09);
+      --red:#dc3545; --red-bg:#fff0f0;
+      --green:#2ecc71; --green-bg:#f0fff4;
+      --gray:#718096;
+    }
+    body {
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:linear-gradient(136deg,#FFCC00 0%,#FFD43B 30%,#2d2d2d 100%);
+      min-height:100vh; padding:24px 20px;
+    }
+    .container { max-width:1100px; margin:0 auto; }
+    .header {
+      background:var(--white); border-radius:14px; padding:24px 30px;
+      box-shadow:var(--shadow); margin-bottom:20px;
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    }
+    .header-left h1 { color:var(--gold-dark); font-size:22px; margin-bottom:4px; }
+    .header-left p  { color:var(--gray); font-size:13px; }
+    .back-btn { padding:9px 18px; background:var(--gold); color:#333; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; }
+    .steps { display:flex; gap:0; background:var(--white); border-radius:12px; padding:16px 24px; margin-bottom:20px; box-shadow:var(--shadow); align-items:center; }
+    .step { display:flex; align-items:center; gap:8px; flex:1; }
+    .step-num { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; background:#e2e8f0; color:#999; flex-shrink:0; }
+    .step-label { font-size:12px; color:#aaa; font-weight:500; }
+    .step.active .step-num  { background:var(--gold); color:#333; }
+    .step.active .step-label { color:var(--gold-dark); }
+    .step.done .step-num   { background:var(--green); color:#fff; }
+    .step.done .step-label  { color:#2ecc71; }
+    .step-divider { flex:0 0 24px; height:2px; background:#e2e8f0; margin:0 4px; }
+    .step-divider.done { background:var(--green); }
+    .card { background:var(--white); border-radius:12px; box-shadow:var(--shadow); padding:24px; margin-bottom:20px; }
+    .card h2 { color:var(--gold-dark); font-size:16px; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid var(--gold-light); }
+    .upload-zone { border:2px dashed var(--gold); border-radius:10px; padding:48px 24px; text-align:center; cursor:pointer; background:linear-gradient(135deg,#fffef5,#fff); }
+    .fields-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+    .field-box { background:#f7fafc; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 14px; }
+    .field-box label { display:block; font-size:10px; font-weight:700; color:var(--gray); text-transform:uppercase; margin-bottom:4px; }
+    .field-box span  { font-size:14px; font-weight:600; color:#2d3748; }
+    .items-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .items-table th { background:linear-gradient(135deg,var(--gold),var(--gold-mid)); padding:10px; text-align:left; font-weight:600; color:#333; }
+    .items-table td { padding:9px 10px; border-bottom:1px solid var(--gold-light); vertical-align:top; direction:rtl; text-align:right; font-family:'Tahoma','Vazir',sans-serif; line-height:1.6; }
+    .items-table td:first-child, .items-table td:nth-child(3), .items-table td:nth-child(4), .items-table td:nth-child(5), .items-table td:nth-child(6) { direction:ltr; text-align:left; }
+    .vbadge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+    .vb-confirmed { background:var(--green-bg); color:#1a7a45; }
+    .vb-disputed  { background:var(--red-bg); color:#8b0000; }
+    .loading-bar { background:#f0f0f0; border-radius:20px; height:8px; overflow:hidden; margin:12px 0; }
+    .loading-bar-fill { height:100%; background:linear-gradient(90deg,var(--gold),var(--gold-mid)); transition:width .4s ease; }
+    .photo-thumb { width:130px; border-radius:8px; overflow:hidden; border:2px solid #e2e8f0; background:#f0f0f0; }
+    .photo-thumb img { width:100%; height:90px; object-fit:cover; display:block; }
+    .photo-thumb .thumb-label { font-size:10px; padding:4px; background:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .verdict-banner { border-radius:12px; padding:20px; text-align:center; margin-bottom:20px; }
+    .verdict-valid   { background:var(--green-bg); border:2px solid var(--green); }
+    .verdict-invalid { background:var(--red-bg);   border:2px solid var(--red); }
+    .stat-box { flex:1; background:#f9f9f9; border-radius:10px; padding:14px; text-align:center; border:1px solid #eee; }
+    .stat-num { font-size:20px; font-weight:bold; color:var(--gold-dark); }
+    .stat-lbl { font-size:11px; color:var(--gray); text-transform:uppercase; }
+    .stats-row { display:flex; gap:12px; margin-bottom:20px; }
+    .btn-validate { width:100%; padding:16px; background:linear-gradient(135deg,var(--gold),var(--gold-mid)); border:none; border-radius:10px; font-size:16px; font-weight:700; color:#333; cursor:pointer; }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>📋 PM Report Validator</h1>
+      <p>Upload PDF, then pick the folder containing photo subfolders (1, 2, 3...).</p>
+    </div>
+    <a href="index.html" class="back-btn">← Back to Tasks</a>
+  </div>
+
+  <div class="steps">
+    <div class="step active" id="step1-ind"><div class="step-num">1</div><div class="step-label">Upload PDF</div></div>
+    <div class="step-divider" id="div1"></div>
+    <div class="step active" id="step2-ind"><div class="step-num">2</div><div class="step-label">Parsed Data</div></div>
+    <div class="step-divider" id="div2"></div>
+    <div class="step" id="step3-ind"><div class="step-num">3</div><div class="step-label">Site Photos</div></div>
+    <div class="step-divider" id="div3"></div>
+    <div class="step" id="step4-ind"><div class="step-num">4</div><div class="step-label">AI Validation</div></div>
+    <div class="step-divider" id="div4"></div>
+    <div class="step" id="step5-ind"><div class="step-num">5</div><div class="step-label">Result</div></div>
+  </div>
+
+  <div class="card" id="card-upload">
+    <h2>Step 1 — Upload PM Report PDF</h2>
+    <div class="upload-zone" onclick="document.getElementById('pdfInput').click()">
+      <p>📄 Click to upload PM Report PDF</p>
+    </div>
+    <input type="file" id="pdfInput" accept=".pdf" style="display:none"/>
+  </div>
+
+  <div class="card hidden" id="card-parsed">
+    <h2>Step 2 — Parsed Report Data</h2>
+    <div class="fields-grid" id="fieldsGrid"></div>
+    <table class="items-table">
+      <thead><tr><th style="width:36px">#</th><th>Description</th><th style="width:100px">Reported</th></tr></thead>
+      <tbody id="itemsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card hidden" id="card-images">
+    <h2>Step 3 — Link Site Photos via Folders</h2>
+    <div class="upload-zone" style="border-color:#ccc" onclick="document.getElementById('folderInput').click()">
+      <p>📁 Select Parent Folder (containing subfolders 1, 2, 3...)</p>
+    </div>
+    <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none"/>
+    <div id="extractedGrid" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:15px"></div>
+    <button class="btn-validate" id="validateBtn" onclick="runValidation()" disabled style="margin-top:20px">🔍 Validate Report with AI</button>
+  </div>
+
+  <div class="card hidden" id="card-progress">
+    <h2>Step 4 — AI Validation in Progress</h2>
+    <div class="loading-bar"><div class="loading-bar-fill" id="progressFill"></div></div>
+    <div id="progressMsg" style="text-align:center; font-size:13px; color:var(--gray);">Initialising...</div>
+  </div>
+
+  <div class="card hidden" id="card-results">
+    <h2>Step 5 — Validation Results</h2>
+    <div id="verdictBanner"></div>
+    <div class="stats-row" id="statsRow"></div>
+    <table class="items-table">
+      <thead><tr><th>#</th><th>Item</th><th>Photo Checks</th><th>PDF Result</th><th>AI Verdict</th><th>AI Explanation</th></tr></thead>
+      <tbody id="valBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ── CONFIG ── */
+const LLM_URL   = 'http://10.130.154.133:8000/v1/chat/completions';
+const LLM_MODEL = './';
+
+const SITES_DATA = [
+  { siteId:'225-Shahrekord-BSC', lat:32.31735333333334, lon:50.861 },
+  { siteId:'SITE002', lat:79,     lon:80 },
+  { siteId:'SITE003', lat:35.6995, lon:51.3380 },
+];
+
+let TASK_RULES = {};
+
+const state = {
+  parsedHeader: {},
+  parsedItems:  [],
+  itemPhotoMap: {},
+  results:      [],
+  siteInfo:     null
+};
+
+/* ══════════════════════════════════════════════
+   STEP 1 — PDF UPLOAD & PARSE
+══════════════════════════════════════════════ */
+document.getElementById('pdfInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+     // WITH this:
+    const fileBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({
+      data: fileBuffer,
+      verbosity: 0,
+      isEvalSupported: false,
+      useWorkerFetch: false,
+      disableAutoFetch: false,
+      disableStream: false,
+      rangeChunkSize: 65536      // 64KB chunks
+    }).promise;
+
+  // ── Parse header fields from raw text ──
+  let fullText = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    fullText += tc.items.map(i => i.str).join('\n') + '\n\f\n';
+  }
+
+  const headerKeys = {
+    'Task ID:'         : 'taskId',
+    'Task Category:'   : 'taskCategory',
+    'Task Subcategory:': 'taskSubcategory',
+    'Site ID:'         : 'siteId',
+    'Report Date:'     : 'reportDate',
+    'Report FME:'      : 'fmeName'
+  };
+  const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+  for (let i = 0; i < lines.length; i++) {
+    for (const [label, key] of Object.entries(headerKeys)) {
+      if (lines[i].startsWith(label))
+        state.parsedHeader[key] = lines[i].replace(label, '').trim() || (lines[i + 1] || '').trim();
+    }
+  }
+
+  const tasks    = await extractTasksFromPdf(pdf);   // same for both languages
+  const llmItems = await extractItemsWithBatching(tasks); // same for both
+  state.parsedItems = tasks.map(task => {
+    const match = llmItems.find(l => parseInt(l.num) === parseInt(task.num));
+    return {
+      num:    task.num,
+      desc:   match?.desc ?? task.desc,
+      result: task.result ?? 'NOT_OK'
+    };
+  });
+
+  console.log('Parsed items:', state.parsedItems);
+  state.siteInfo = SITES_DATA.find(
+    s => s.siteId.toUpperCase() === (state.parsedHeader.siteId || '').toUpperCase()
+  ) || null;
+
+  renderParsedData();
+});
+
+/* ══════════════════════════════════════════════
+   PDF COORDINATE-BASED TASK EXTRACTOR
+
+   WHY DUPLICATES HAPPENED:
+   ─────────────────────────────────────────────
+   Each task in the Irancell PDF is rendered in 3 rows:
+     Row A: description text  |  "ok" plain text
+     Row B: description text  |  ☑OK  □Not OK   ← real checkbox row
+     Row C: description text  |  photos
+
+   All three rows contain the description text.
+   Rows A and C also contain the text "Not OK" as a column label.
+   The old code anchored on EVERY "Not OK" token = 3 anchors per task
+   = 3 boundary zones = 3 duplicate extractions per task.
+
+   FIX:
+   ─────────────────────────────────────────────
+   Only treat a "Not OK" as a task boundary when an "OK" token exists
+   at the SAME Y coordinate (±5 px). That condition is true ONLY for
+   Row B (the actual checkbox row), never for rows A or C.
+   Result: exactly 1 anchor per task = correct task count.
+══════════════════════════════════════════════ */
+async function extractTasksFromPdf(pdf) {
+  const tasks = [];
+  let taskCounter = 1;
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const tc   = await page.getTextContent();
+
+    const items = tc.items
+      .map(it => ({ str: (it.str || '').trim(), x: it.transform[4], y: it.transform[5] }))
+      .filter(it => it.str);
+
+    const okItems        = items.filter(it => /^ok$/i.test(it.str));
+    const checkboxNotOks = items
+      .filter(it => /Not\s*Ok/i.test(it.str))
+      .filter(notOk => okItems.some(ok => Math.abs(ok.y - notOk.y) <= 10));
+
+    if (!checkboxNotOks.length) { page.cleanup(); continue; }
+
+    const anchorYs   = checkboxNotOks.map(it => it.y).sort((a, b) => b - a);
+    const boundaries = anchorYs.map((y, i) => ({
+      anchorY: y,
+      top:    i === 0                   ? 1e5  : (anchorYs[i - 1] + y) / 2,
+      bottom: i === anchorYs.length - 1 ? -1e5 : (y + anchorYs[i + 1]) / 2,
+    }));
+
+    // ── Get checkbox strips for ALL tasks on this page in parallel ──
+    const strips  = await getCheckboxStripImage(pdf, pageNum, anchorYs);
+    const results = await Promise.all(strips.map(detectCheckboxFromStrip));
+    console.log(`Page ${pageNum} checkbox results:`, results);
+
+    for (let bi = 0; bi < boundaries.length; bi++) {
+      const { top, bottom } = boundaries[bi];
+      const result = results[bi] ?? 'OK';
+
+      const box = items
+        .filter(it => it.y < top && it.y > bottom)
+        .filter(it => it.y > (bottom + 10))
+        .filter(it => !/(^|\b)(ok|not\s*ok)(\b|$)|☑|☐|✓|✗/i.test(it.str));
+
+      box.sort((a, b) => Math.abs(a.y - b.y) > 3 ? a.y - b.y : b.x - a.x);
+      const desc = box.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+
+      if (desc.length > 5) {
+        console.log(`  Task ${taskCounter}: vision strip → ${result}`);
+        tasks.push({ num: taskCounter++, desc, result });
+      }
+    }
+    page.cleanup();
+  }
+
+  await pdf.destroy();
+  return tasks;
+}
+
+/* ── Extract all AcroForm checkbox fields from PDF ── */
+async function extractFormFields(pdf) {
+  const fields = [];
+  try {
+    const fieldObjects = await pdf.getFieldObjects();
+    console.log('Raw field objects:', fieldObjects);
+
+    if (!fieldObjects) return fields;
+
+    for (const [name, fieldArray] of Object.entries(fieldObjects)) {
+      for (const field of fieldArray) {
+        fields.push({
+          name,
+          type:  field.type,
+          value: field.value,      // "On", "Off", "Yes", "No", or custom
+          page:  field.page + 1,   // pdf.js uses 0-based page index
+          x:     field.rect?.[0],
+          y:     field.rect?.[1],
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('getFieldObjects failed:', err);
+  }
+  return fields;
+}
+
+/* ══════════════════════════════════════════════
+   SMART CHUNKING — one LLM call per task block
+══════════════════════════════════════════════ */
+async function getCheckboxStripImage(pdf, pageNum, anchorYs) {
+  const page     = await pdf.getPage(pageNum);
+  const viewport = page.getViewport({ scale: 2.0 });
+
+  const canvas    = document.createElement('canvas');
+  canvas.width    = viewport.width;
+  canvas.height   = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+  // ── Crop ONLY the checkbox column (x=185-305 in PDF units, scaled ×2) ──
+  // This is a narrow vertical strip containing just OK / Not OK checkboxes
+  const SCALE   = 2;
+  const cropX   = 170 * SCALE;   // left edge of checkbox area
+  const cropW   = 160 * SCALE;   // width covering OK + Not OK columns
+  const PADDING = 30 * SCALE;    // vertical padding around each checkbox row
+
+  // One strip per anchor Y — tiny image per task
+  const strips = [];
+  for (const anchorY of anchorYs) {
+    // PDF y=0 is bottom — flip to canvas coords
+    const canvasY = viewport.height - (anchorY * SCALE) - PADDING;
+    const cropH   = PADDING * 2;
+
+    const strip   = document.createElement('canvas');
+    strip.width   = cropW;
+    strip.height  = cropH;
+    strip.getContext('2d').drawImage(canvas, cropX, canvasY, cropW, cropH, 0, 0, cropW, cropH);
+
+    strips.push(strip.toDataURL('image/jpeg', 0.9));
+  }
+
+  return strips;
+}
+
+async function detectCheckboxFromStrip(stripBase64) {
+  const prompt = `This image shows a single checkbox row from a maintenance report.
+It contains two checkboxes: one for "OK" and one for "Not OK".
+Look carefully at which checkbox has a checkmark/tick inside it.
+
+Return ONLY one of these two values, nothing else:
+OK
+NOT_OK`;
+
+  try {
+    const res = await fetch(LLM_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: LLM_MODEL,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text',      text: prompt },
+            { type: 'image_url', image_url: { url: stripBase64 } }
+          ]
+        }],
+        temperature: 0
+      })
+    });
+    const data   = await res.json();
+    const answer = (data.choices?.[0]?.message?.content || '').trim().toUpperCase();
+    return answer.includes('NOT_OK') ? 'NOT_OK' : 'OK';
+  } catch (err) {
+    console.error('Strip vision error:', err);
+    return 'OK';
+  }
+}
+function dedupeItems(items) {
+  const seen = new Map();
+
+  items.forEach(item => {
+    if (!item.desc) return;
+
+    const normalizedDesc = item.desc
+      .trim()
+      .replace(/[\u200c\u200b\u200e\u200f]/g, '')
+      .replace(/\s+/g, '')
+      .replace(/[.,،;؛]/g, '');
+
+    const key = item.num + '|' + normalizedDesc; // ✅ مهم
+
+    if (!seen.has(key)) {
+      seen.set(key, item);
+    }
+  });
+
+  return Array.from(seen.values())
+    .sort((a, b) => a.num - b.num);
+}    
+async function extractItemsWithBatching(tasks) {
+  const CHUNK_SIZE = 5; // 🔥 خیلی مهم — میتونی 4 تا 7 تست کنی
+  let allItems = [];
+
+  for (let i = 0; i < tasks.length; i += CHUNK_SIZE) {
+    const batch = tasks.slice(i, i + CHUNK_SIZE);
+
+    const text = batch
+      .map(t => `${t.num}. ${t.desc}\nNot OK`)
+      .join('\n');
+
+    console.log(`LLM batch ${i / CHUNK_SIZE + 1}: items ${batch[0].num}-${batch[batch.length - 1].num}`);
+
+    const results = await callLLMExtract(text);
+
+    // ⛑️ fail-safe
+    if (!results.length) {
+      console.warn('Empty LLM result, using fallback for batch');
+      allItems.push(...batch.map(t => ({
+        num: t.num,
+        desc: t.desc,
+        result: 'NOT_OK'
+      })));
+      continue;
+    }
+
+    allItems.push(...results);
+  }
+
+  return dedupeItems(allItems);
+}
+    
+async function extractItemsWithSmartChunking(fullText) {
+  const rawChunks = fullText.split(/not\s*ok/i).map(c => c.trim()).filter(Boolean);
+  console.log(`Smart chunking: ${rawChunks.length} chunks`);
+
+  const allItems = [];
+  for (let i = 0; i < rawChunks.length; i++) {
+    const clean = preprocessText(rawChunks[i]);
+    if (!clean) continue;
+    const results = await callLLMExtract(clean);
+    allItems.push(...results);
+  }
+
+// Deduplicate by description, renumber
+    const seen = new Map();
+      allItems.forEach(item => {
+        if (item.desc) {
+          // نرمال‌سازی فوق‌العاده دقیق برای زبان فارسی
+          const normalizedDesc = item.desc
+            .trim()
+            .replace(/[\u200c\u200b\u200e\u200f]/g, '') // ۱. حذف نیم‌فاصله و کاراکترهای نامرئی کنترل جهت
+            .replace(/\s+/g, '')                      // ۲. حذف تمام فاصله‌ها (چسباندن کلمات به هم برای مقایسه)
+            .replace(/[.,،;؛]/g, '')                   // ۳. حذف تمام علائم نگارشی (نقطه، ویرگول و...)
+            .replace(/ی/g, 'ی').replace(/ک/g, 'ک');    // ۴. یکسان‌سازی ی و ک (اگر از فونت‌های مختلف باشند)
+    
+          // ذخیره در Map؛ اگر متن (بدون فاصله و نیم‌فاصله) تکراری باشد، نادیده گرفته می‌شود
+          if (!seen.has(normalizedDesc)) {
+            seen.set(normalizedDesc, item);
+          }
+        }
+      });
+    
+      return Array.from(seen.values()).map((item, i) => ({ 
+        ...item, 
+        num: i + 1 
+      }));
+}
+
+/* ══════════════════════════════════════════════
+   LLM EXTRACTION CALL
+══════════════════════════════════════════════ */
+async function callLLMExtract(textChunk) {
+  const prompt = `
+The following text is raw extraction from a PDF maintenance report.
+It may be in Persian or English.
+
+TASK:
+1. If Persian: fix character shaping and joining.
+2. If English: fix any broken words, extra spaces, or garbled text from PDF extraction.
+2. If English: tasks start with numbers. consider highest number task.
+3. Extract each unique maintenance task description cleanly.
+4. Return ONLY a JSON array — no markdown, no preamble.
+
+Format: [{"num": 1, "desc": "clean task description", "result": "NOT_OK"}]
+
+Rules:
+- desc must be clean text (Persian or English)
+- Ignore header lines (Site ID, Contractor, Region, Task ID, Report Date, etc.)
+- Do not duplicate sentences
+- Do not merge separate tasks into one
+
+RAW TEXT:
+${textChunk}`;
+
+  try {
+    const res = await fetch(LLM_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: LLM_MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1
+      })
+    });
+    if (!res.ok) { console.error('LLM HTTP error', res.status); return []; }
+    const data  = await res.json();
+    const raw   = data.choices?.[0]?.message?.content || '';
+    const match = raw.match(/\[[\s\S]*\]/);
+    return match ? JSON.parse(match[0]) : [];
+  } catch (err) {
+    console.error('LLM extraction error:', err);
+    return [];
+  }
+}
+
+/* ══════════════════════════════════════════════
+   ENGLISH ITEM EXTRACTOR
+══════════════════════════════════════════════ */
+async function extractItemsEnglish(pdf) {
+  const tasks = [];
+  let taskCounter = 1;
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const tc   = await page.getTextContent();
+
+    const items = tc.items
+      .map(it => ({ str: (it.str || '').trim(), x: it.transform[4], y: it.transform[5] }))
+      .filter(it => it.str);
+
+    const okItems        = items.filter(it => /^ok$/i.test(it.str));
+    const checkboxNotOks = items
+      .filter(it => /Not\s*Ok/i.test(it.str))
+      .filter(notOk => okItems.some(ok => Math.abs(ok.y - notOk.y) <= 10));
+
+    if (!checkboxNotOks.length) { page.cleanup(); continue; }
+
+    const anchorYs   = checkboxNotOks.map(it => it.y).sort((a, b) => b - a);
+    const boundaries = anchorYs.map((y, i) => ({
+      anchorY: y,
+      top:    i === 0                   ? 1e5  : (anchorYs[i - 1] + y) / 2,
+      bottom: i === anchorYs.length - 1 ? -1e5 : (y + anchorYs[i + 1]) / 2,
+    }));
+
+    // ── Same checkbox vision strips as Persian ──
+    const strips  = await getCheckboxStripImage(pdf, pageNum, anchorYs);
+    const results = await Promise.all(strips.map(detectCheckboxFromStrip));
+    console.log(`Page ${pageNum} checkbox results:`, results);
+
+    for (let bi = 0; bi < boundaries.length; bi++) {
+      const { top, bottom } = boundaries[bi];
+      const result = results[bi] ?? 'OK';
+
+      const box = items
+        .filter(it => it.y < top && it.y > bottom)
+        .filter(it => it.y > (bottom + 10))
+        .filter(it => !/(^|\b)(ok|not\s*ok)(\b|$)|☑|☐|✓|✗/i.test(it.str));
+
+      box.sort((a, b) => Math.abs(a.y - b.y) > 3 ? a.y - b.y : b.x - a.x);
+
+      // ── No LLM cleanup needed — English text is already clean ──
+      const desc = box.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+
+      if (desc.length > 5) {
+        console.log(`  Task ${taskCounter}: "${desc.slice(0, 40)}..." → ${result}`);
+        tasks.push({ num: taskCounter++, desc, result });
+      }
+    }
+    page.cleanup();
+  }
+
+  await pdf.destroy();
+  return tasks;
+}
+
+/* ══════════════════════════════════════════════
+   TEXT PREPROCESSING
+══════════════════════════════════════════════ */
+function preprocessText(text) {
+  return text
+    .normalize('NFKC')
+    .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
+    .replace(/[\u200c\u200f\u202a-\u202e]/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{2,}/g, '\n')
+    .split('\n')
+    .map(l => l.trim())
+    .filter((l, i, arr) => l && arr.indexOf(l) === i)
+    .join('\n')
+    .trim();
+}
+
+function detectPersian(text) {
+  return (text.match(/[\u0600-\u06FF]/g) || []).length > 50;
+}
+
+/* ══════════════════════════════════════════════
+   STEP 2 — RENDER PARSED DATA
+══════════════════════════════════════════════ */
+function renderParsedData() {
+  const h = state.parsedHeader;
+  const fieldDefs = [
+    { key:'taskId', label:'Task ID' }, { key:'siteId', label:'Site ID' },
+    { key:'reportDate', label:'Date' }, { key:'taskCategory', label:'Task Category' },
+    { key:'taskSubcategory', label:'Task Subcategory' }, { key:'fmeName', label:'Report FME' }
+  ];
+  document.getElementById('fieldsGrid').innerHTML = fieldDefs
+    .map(f => `<div class="field-box"><label>${f.label}</label><span>${h[f.key] || '—'}</span></div>`).join('');
+  document.getElementById('itemsBody').innerHTML = state.parsedItems
+    .map(i => `<tr><td>${i.num}</td><td>${i.desc}</td><td>${i.result === 'OK' ? '✅ OK' : '❌ Not OK'}</td></tr>`).join('');
+  show('card-parsed'); show('card-images'); setStep(3);
+}
+
+/* ══════════════════════════════════════════════
+   STEP 3 — FOLDER PICKER
+══════════════════════════════════════════════ */
+document.getElementById('folderInput').addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  state.itemPhotoMap = {};
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    const parts   = file.webkitRelativePath.split('/');
+    const itemNum = parseInt(parts[parts.length - 2]);
+    if (isNaN(itemNum)) continue;
+    if (!state.itemPhotoMap[itemNum]) state.itemPhotoMap[itemNum] = [];
+    const base64 = await new Promise(r => {
+      const rd = new FileReader(); rd.onload = ev => r(ev.target.result); rd.readAsDataURL(file);
+    });
+    state.itemPhotoMap[itemNum].push({ name: file.name, base64 });
+  }
+  document.getElementById('validateBtn').disabled = false;
+  const grid = document.getElementById('extractedGrid');
+  grid.innerHTML = '';
+  Object.keys(state.itemPhotoMap).forEach(n =>
+    state.itemPhotoMap[n].forEach(img => {
+      grid.innerHTML += `<div class="photo-thumb"><img src="${img.base64}"><div class="thumb-label">Item ${n}: ${img.name}</div></div>`;
+    })
+  );
+});
+
+/* ══════════════════════════════════════════════
+   STEP 4 — AI VALIDATION
+══════════════════════════════════════════════ */
+async function runValidation() {
+  show('card-progress'); setStep(4);
+  state.results = [];
+  const siteLat    = state.siteInfo?.lat ?? null;
+  const siteLon    = state.siteInfo?.lon ?? null;
+  const reportDate = state.parsedHeader.reportDate || '';
+
+  for (let i = 0; i < state.parsedItems.length; i++) {
+    const item   = state.parsedItems[i];
+    const photos = state.itemPhotoMap[item.num] || [];
+    const rule   = TASK_RULES?.[state.parsedHeader.taskCategory]?.[state.parsedHeader.taskSubcategory]?.[item.num] ?? null;
+
+    setProgress(Math.round(((i + 1) / state.parsedItems.length) * 100), `Validating item ${item.num}…`);
+
+    if (!photos.length) {
+      state.results.push({ row: item.num, verdict: 'NO_EVIDENCE', causes: [], explanation: `No photos in folder ${item.num}`, metaList: [] });
+      continue;
+    }
+
+    const metaList = await Promise.all(photos.map(extractImageMeta));
+    const reportDateOnly = reportDate.match(/(\d{4}-\d{2}-\d{2})/)?.[1] || '';
+
+    for (const m of metaList) {
+      if (reportDateOnly && m.date) {
+        const diffDays = Math.abs(new Date(m.date) - new Date(reportDateOnly)) / 86400000;
+        m.dateOk    = diffDays <= 3;
+        m.dateLabel = m.dateOk ? `✓ ${m.date} (within 3 days)` : `✗ ${m.date} (${Math.round(diffDays)} days off)`;
+      } else {
+        m.dateOk    = null;
+        m.dateLabel = m.date ? `? ${m.date} (report date missing)` : '? no date in watermark';
+      }
+      if (siteLat != null && m.lat != null) {
+        m.dist     = Math.round(haversine(siteLat, siteLon, m.lat, m.lon));
+        m.gpsOk    = m.dist <= 300;
+        m.gpsLabel = m.gpsOk ? `✓ on-site (${m.dist} m)` : `✗ off-site (${m.dist} m away)`;
+      } else {
+        m.dist = null; m.gpsOk = null;
+        m.gpsLabel = m.lat != null ? '? site GPS not registered' : '? no GPS in watermark';
+      }
+    }
+
+    const metaSummary = metaList
+      .map(m => `  - ${m.name}: date=${m.dateLabel}, GPS=${m.lat != null ? `${m.lat},${m.lon}` : 'not found'}(${m.gpsLabel})`)
+      .join('\n');
+
+    try {
+      const content = [
+        { type: 'text', text: buildValidationPrompt(item, photos.length, reportDate, siteLat, siteLon, metaSummary, rule) },
+        ...photos.map(p => ({ type: 'image_url', image_url: { url: p.base64 } }))
+      ];
+      const raw   = await callLLM(content);
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('No JSON in response');
+      state.results.push({ ...JSON.parse(match[0]), photoCount: photos.length, metaList });
+    } catch (err) {
+      state.results.push({ row: item.num, verdict: 'NO_EVIDENCE', causes: [], explanation: `Validation error: ${err.message}`, metaList });
+    }
+  }
+  renderResults();
+}
+
+function buildValidationPrompt(item, photoCount, reportDate, siteLat, siteLon, metaSummary, rule) {
+  const ruleText = rule
+    ? `EXPECTED CONDITION: ${rule.expected || '-'}\nCHECKPOINTS:\n${(rule.checkpoints||[]).map(c=>'- '+c).join('\n')}\nFAIL CONDITIONS:\n${(rule.fail_if||[]).map(f=>'- '+f).join('\n')}`
+    : 'No additional rules provided.';
+
+  return `You are an expert AI validator for Irancell PM (Preventive Maintenance) reports.
+TASK: Validate ONE checklist item using ONLY its dedicated site photos.
+
+REPORT:
+  Task ID:     ${state.parsedHeader.taskId || '?'}
+  Site ID:     ${state.parsedHeader.siteId || '?'}
+  Report Date: ${reportDate}
+  Site GPS:    ${siteLat ? `${siteLat}, ${siteLon}` : 'not registered'}
+
+ITEM TO VALIDATE:
+  Row: ${item.num} | Description: ${item.desc} | Reported: ${item.result || 'NO_RESULT'} | Photos: ${photoCount}
+
+ADDITIONAL VALIDATION RULES:
+${ruleText}
+
+PHOTO METADATA:
+${metaSummary}
+
+Determine:
+1. VERDICT: "CONFIRMED" | "DISPUTED" | "NO_EVIDENCE"
+2. CAUSES (only applicable): "IMAGE_DATE_MISMATCH" | "IMAGE_GPS_MISMATCH" | "IMAGE_GPS_MISSING" | "IRRELEVANT_IMAGE" | "MARKED_OK_BUT_DEFECT" | "MARKED_NOTOK_BUT_FINE" | "PHOTO_QUALITY"
+3. EXPLANATION: 1-2 sentences.
+
+Return ONLY valid JSON (no markdown):
+{"row":${item.num},"verdict":"CONFIRMED","causes":[],"explanation":"…"}`;
+}
+
+/* ══════════════════════════════════════════════
+   IMAGE METADATA EXTRACTION
+══════════════════════════════════════════════ */
+async function extractImageMeta(img) {
+  try {
+    const raw = await callLLM([
+      { type: 'text', text: 'Extract date (YYYY-MM-DD), latitude, longitude from image watermark. Return ONLY JSON: {"date":"...","latitude":0,"longitude":0}' },
+      { type: 'image_url', image_url: { url: img.base64 } }
+    ]);
+    const d = JSON.parse(raw.match(/\{[\s\S]*\}/)[0]);
+    return { name: img.name, date: d.date || null, lat: d.latitude || null, lon: d.longitude || null };
+  } catch {
+    return { name: img.name, date: null, lat: null, lon: null };
+  }
+}
+
+/* ══════════════════════════════════════════════
+   STEP 5 — RENDER RESULTS
+══════════════════════════════════════════════ */
+function renderResults() {
+  hide('card-progress'); show('card-results'); setStep(5);
+  const confirmed = state.results.filter(r => r.verdict === 'CONFIRMED').length;
+  const disputed  = state.results.filter(r => r.verdict === 'DISPUTED').length;
+  const total     = state.results.length;
+  const validPct  = total > 0 ? Math.round(confirmed / total * 100) : 0;
+
+  document.getElementById('verdictBanner').innerHTML = `
+    <div class="verdict-banner ${disputed === 0 ? 'verdict-valid' : 'verdict-invalid'}">
+      <div style="font-size:20px;font-weight:bold">${disputed === 0 ? '✅ REPORT VALIDATED' : '❌ REPORT DISPUTED'}</div>
+      <div>${disputed === 0 ? 'All inspected items confirmed.' : `${disputed} item(s) disputed.`}</div>
+    </div>`;
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-box"><div class="stat-num">${validPct}%</div><div class="stat-lbl">Confirmation</div></div>
+    <div class="stat-box"><div class="stat-num">${confirmed}</div><div class="stat-lbl">Confirmed</div></div>
+    <div class="stat-box"><div class="stat-num">${disputed}</div><div class="stat-lbl">Disputed</div></div>
+    <div class="stat-box"><div class="stat-num">${total}</div><div class="stat-lbl">Total</div></div>`;
+
+  const causeLabels = {
+    IMAGE_DATE_MISMATCH:'📅 Date mismatch', IMAGE_GPS_MISMATCH:'📍 GPS mismatch',
+    IMAGE_GPS_MISSING:'📍 GPS missing', IRRELEVANT_IMAGE:'🖼️ Irrelevant image',
+    MARKED_OK_BUT_DEFECT:'⚠️ Marked OK but defect visible',
+    MARKED_NOTOK_BUT_FINE:'✅ Marked Not OK but looks fine', PHOTO_QUALITY:'📷 Poor photo quality',
+  };
+
+  document.getElementById('valBody').innerHTML = state.results.map(r => {
+    const item = state.parsedItems.find(i => i.num === r.row) || {};
+    const photoChecksHtml = !(r.metaList?.length)
+      ? `<span style="color:var(--gray);font-size:12px">no photos</span>`
+      : r.metaList.map(m => `
+          <div style="margin-bottom:6px;padding:5px 7px;background:#f7fafc;border-radius:6px;border:1px solid #e2e8f0">
+            <div style="font-size:10px;color:var(--gray);margin-bottom:3px;font-weight:600">${m.name}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:${m.dateOk===true?'#f0fff4':m.dateOk===false?'#fff0f0':'#f7fafc'};color:${m.dateOk===true?'#1a7a45':m.dateOk===false?'#8b0000':'#718096'}">${m.dateOk===true?'✓':m.dateOk===false?'✗':'?'} ${m.dateLabel}</span>
+              <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:${m.gpsOk===true?'#f0fff4':m.gpsOk===false?'#fff0f0':'#f7fafc'};color:${m.gpsOk===true?'#1a7a45':m.gpsOk===false?'#8b0000':'#718096'}">${m.gpsOk===true?'✓':m.gpsOk===false?'✗':'?'} ${m.gpsLabel}</span>
+            </div>
+          </div>`).join('');
+    const causesHtml = (r.causes||[]).map(c=>`<div style="color:red;font-size:11px;font-weight:bold;margin-bottom:2px">${causeLabels[c]||c}</div>`).join('');
+    return `<tr>
+      <td>${r.row}</td><td>${item.desc||''}</td><td>${photoChecksHtml}</td>
+      <td>${item.result||''}</td>
+      <td><span class="vbadge ${r.verdict==='CONFIRMED'?'vb-confirmed':'vb-disputed'}">${r.verdict}</span></td>
+      <td>${causesHtml}<div style="font-size:12px;color:#2d3748;margin-top:${causesHtml?'4px':'0'}">${r.explanation}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════
+   UTILITIES
+══════════════════════════════════════════════ */
+async function callLLM(content) {
+  const res  = await fetch(LLM_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:LLM_MODEL, messages:[{role:'user',content}]}) });
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+function haversine(lat1,lon1,lat2,lon2) {
+  const R=6371000, φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180;
+  const Δφ=(lat2-lat1)*Math.PI/180, Δλ=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function setProgress(pct,msg) { document.getElementById('progressFill').style.width=pct+'%'; document.getElementById('progressMsg').innerText=msg; }
+function setStep(n) { for(let i=1;i<=5;i++){document.getElementById(`step${i}-ind`).className=`step ${i<n?'done':i===n?'active':''}`;const d=document.getElementById(`div${i}`);if(d)d.className=`step-divider ${i<n?'done':''}`; } }
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+async function loadTaskRules() {
+  try { TASK_RULES = await (await fetch('task_rules.json')).json(); } catch { TASK_RULES = {}; }
+}
+loadTaskRules();
+</script>
+</body>
+</html>
