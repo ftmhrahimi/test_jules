@@ -3,843 +3,1063 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Irancell — Validate PM Report</title>
+  <title>Irancell — PM Batch Validator</title>
   <script src="./js/pdf.min.js"></script>
-  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "./js/pdf.worker.min.js";</script>
+  <script>if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc="./js/pdf.worker.min.js";</script>
   <style>
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    :root {
-      --gold:#FFCC00; --gold-dark:#997301; --gold-mid:#FFD700;
-      --gold-light:#FCE068; --white:#ffffff;
-      --shadow:0 2px 12px rgba(0,0,0,.09);
-      --red:#dc3545; --red-bg:#fff0f0;
-      --green:#2ecc71; --green-bg:#f0fff4;
-      --gray:#718096;
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+    :root{
+      --gold:#FFCC00;--gold-dark:#7a5800;--gold-mid:#FFD700;--gold-light:#FFF3B0;
+      --white:#fff;--red:#dc3545;--red-bg:#fff0f0;--green:#1a9e55;--green-bg:#f0fff4;
+      --gray:#718096;--border:#e2e8f0;--surface:#f7f8fa;
     }
-    body {
-      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-      background:linear-gradient(136deg,#FFCC00 0%,#FFD43B 30%,#2d2d2d 100%);
-      min-height:100vh; padding:24px 20px;
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--surface);min-height:100vh;padding:28px 20px;}
+    .container{max-width:1100px;margin:0 auto;}
+
+    /* HEADER */
+    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+    .logo{display:flex;align-items:center;gap:10px;}
+    .logo-icon{width:38px;height:38px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px;}
+    .logo h1{font-size:16px;font-weight:600;color:#1a1a1a;}
+    .logo p{font-size:11px;color:var(--gray);margin-top:1px;}
+
+    /* DIRECTORY CARD */
+    .dir-card{background:var(--white);border:0.5px solid var(--border);border-radius:12px;padding:18px 22px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+    .dir-path{flex:1;font-size:13px;color:#1a1a1a;padding:8px 12px;background:var(--surface);border:0.5px solid var(--border);border-radius:8px;min-width:200px;word-break:break-all;}
+    .dir-path.empty{color:var(--gray);}
+    .btn-pick{padding:9px 18px;background:var(--gold);border:none;border-radius:8px;font-size:13px;font-weight:600;color:#333;cursor:pointer;white-space:nowrap;}
+    .btn-pick:hover{background:var(--gold-mid);}
+    .btn-run{padding:9px 18px;background:#1a9e55;border:none;border-radius:8px;font-size:13px;font-weight:600;color:#fff;cursor:pointer;white-space:nowrap;}
+    .btn-run:disabled{background:#ccc;cursor:not-allowed;color:#888;}
+
+    /* SUMMARY STATS */
+    .summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+    .stat-card{background:var(--white);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center;}
+    .stat-num{font-size:20px;font-weight:600;color:#1a1a1a;}
+    .stat-num.gold{color:var(--gold-dark);}
+    .stat-num.green{color:var(--green);}
+    .stat-num.red{color:var(--red);}
+    .stat-lbl{font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;}
+
+    /* JOBS TABLE */
+    .table-wrap{background:var(--white);border:0.5px solid var(--border);border-radius:12px;overflow:hidden;}
+    .jobs-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}
+    .jobs-table th{background:var(--surface);padding:10px 14px;text-align:left;font-weight:500;color:var(--gray);font-size:11px;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border);}
+    .jobs-table td{padding:11px 14px;border-bottom:0.5px solid var(--border);vertical-align:middle;color:#2d3748;}
+    .jobs-table tr:last-child td{border-bottom:none;}
+    th.col-id,td.col-id{width:160px;}
+    th.col-task,td.col-task{width:220px;}
+    th.col-bar,td.col-bar{width:auto;}
+    th.col-pct,td.col-pct{width:100px;text-align:center;}
+    th.col-act,td.col-act{width:130px;text-align:center;}
+
+    /* PROGRESS BAR */
+    .bar-wrap{display:flex;align-items:center;gap:8px;}
+    .bar-track{flex:1;height:7px;background:#eee;border-radius:99px;overflow:hidden;}
+    .bar-fill{height:100%;border-radius:99px;background:var(--gold);transition:width .35s ease;}
+    .bar-fill.done{background:var(--green);}
+    .bar-fill.error{background:var(--red);}
+    .bar-label{font-size:11px;color:var(--gray);white-space:nowrap;min-width:120px;}
+
+    /* PCT */
+    .pct-cell{font-size:15px;font-weight:600;}
+    .pct-cell.high{color:var(--green);}
+    .pct-cell.mid{color:#d4a017;}
+    .pct-cell.low{color:var(--red);}
+    .pct-cell.na{color:var(--gray);}
+
+    /* BUTTONS */
+    .btn-view{padding:7px 14px;background:var(--white);border:0.5px solid var(--border);border-radius:7px;font-size:12px;font-weight:500;color:#333;cursor:pointer;}
+    .btn-view:hover{background:var(--surface);}
+    .btn-view.ready{background:#f0fff4;border-color:#b8e6cc;color:#1a7a45;font-weight:600;}
+
+    .header-info-box{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:10px;
+      margin-bottom:18px;
+      padding:14px;
+      background:var(--surface);
+      border:0.5px solid var(--border);
+      border-radius:10px;
     }
-    .container { max-width:1100px; margin:0 auto; }
-    .header {
-      background:var(--white); border-radius:14px; padding:24px 30px;
-      box-shadow:var(--shadow); margin-bottom:20px;
-      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    
+    .hinfo-item{
+      display:flex;
+      flex-direction:column;
     }
-    .header-left h1 { color:var(--gold-dark); font-size:22px; margin-bottom:4px; }
-    .header-left p  { color:var(--gray); font-size:13px; }
-    .back-btn { padding:9px 18px; background:var(--gold); color:#333; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; }
-    .steps { display:flex; gap:0; background:var(--white); border-radius:12px; padding:16px 24px; margin-bottom:20px; box-shadow:var(--shadow); align-items:center; }
-    .step { display:flex; align-items:center; gap:8px; flex:1; }
-    .step-num { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; background:#e2e8f0; color:#999; flex-shrink:0; }
-    .step-label { font-size:12px; color:#aaa; font-weight:500; }
-    .step.active .step-num  { background:var(--gold); color:#333; }
-    .step.active .step-label { color:var(--gold-dark); }
-    .step.done .step-num   { background:var(--green); color:#fff; }
-    .step.done .step-label  { color:#2ecc71; }
-    .step-divider { flex:0 0 24px; height:2px; background:#e2e8f0; margin:0 4px; }
-    .step-divider.done { background:var(--green); }
-    .card { background:var(--white); border-radius:12px; box-shadow:var(--shadow); padding:24px; margin-bottom:20px; }
-    .card h2 { color:var(--gold-dark); font-size:16px; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid var(--gold-light); }
-    .upload-zone { border:2px dashed var(--gold); border-radius:10px; padding:48px 24px; text-align:center; cursor:pointer; background:linear-gradient(135deg,#fffef5,#fff); }
-    .fields-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
-    .field-box { background:#f7fafc; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 14px; }
-    .field-box label { display:block; font-size:10px; font-weight:700; color:var(--gray); text-transform:uppercase; margin-bottom:4px; }
-    .field-box span  { font-size:14px; font-weight:600; color:#2d3748; }
-    .items-table { width:100%; border-collapse:collapse; font-size:13px; }
-    .items-table th { background:linear-gradient(135deg,var(--gold),var(--gold-mid)); padding:10px; text-align:left; font-weight:600; color:#333; }
-    .items-table td { padding:9px 10px; border-bottom:1px solid var(--gold-light); vertical-align:top; direction:rtl; text-align:right; font-family:'Tahoma','Vazir',sans-serif; line-height:1.6; }
-    .items-table td:first-child, .items-table td:nth-child(3), .items-table td:nth-child(4), .items-table td:nth-child(5), .items-table td:nth-child(6) { direction:ltr; text-align:left; }
-    .vbadge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; }
-    .vb-confirmed { background:var(--green-bg); color:#1a7a45; }
-    .vb-disputed  { background:var(--red-bg); color:#8b0000; }
-    .loading-bar { background:#f0f0f0; border-radius:20px; height:8px; overflow:hidden; margin:12px 0; }
-    .loading-bar-fill { height:100%; background:linear-gradient(90deg,var(--gold),var(--gold-mid)); transition:width .4s ease; }
-    .photo-thumb { width:130px; border-radius:8px; overflow:hidden; border:2px solid #e2e8f0; background:#f0f0f0; }
-    .photo-thumb img { width:100%; height:90px; object-fit:cover; display:block; }
-    .photo-thumb .thumb-label { font-size:10px; padding:4px; background:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .verdict-banner { border-radius:12px; padding:20px; text-align:center; margin-bottom:20px; }
-    .verdict-valid   { background:var(--green-bg); border:2px solid var(--green); }
-    .verdict-invalid { background:var(--red-bg);   border:2px solid var(--red); }
-    .stat-box { flex:1; background:#f9f9f9; border-radius:10px; padding:14px; text-align:center; border:1px solid #eee; }
-    .stat-num { font-size:20px; font-weight:bold; color:var(--gold-dark); }
-    .stat-lbl { font-size:11px; color:var(--gray); text-transform:uppercase; }
-    .stats-row { display:flex; gap:12px; margin-bottom:20px; }
-    .btn-validate { width:100%; padding:16px; background:linear-gradient(135deg,var(--gold),var(--gold-mid)); border:none; border-radius:10px; font-size:16px; font-weight:700; color:#333; cursor:pointer; }
-    .hidden { display:none !important; }
+    
+    .hinfo-label{
+      font-size:10px;
+      color:var(--gray);
+      text-transform:uppercase;
+      margin-bottom:3px;
+      letter-spacing:.04em;
+    }
+    
+    .hinfo-value{
+      font-size:13px;
+      color:#1a1a1a;
+      font-weight:500;
+      word-break:break-word;
+    }  
+
+    /* MODAL OVERLAY */
+    .modal-overlay{display:none;position:absolute;top:0;left:0;right:0;min-height:100%;background:rgba(0,0,0,.45);z-index:100;padding:28px 16px;}
+    .modal-overlay.open{display:flex;align-items:flex-start;justify-content:center;}
+    .modal-box{background:var(--white);border-radius:14px;border:0.5px solid var(--border);width:100%;max-width:980px;overflow:hidden;}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:0.5px solid var(--border);}
+    .modal-header h2{font-size:15px;font-weight:600;color:#1a1a1a;}
+    .modal-close{padding:6px 12px;background:var(--surface);border:0.5px solid var(--border);border-radius:7px;font-size:13px;cursor:pointer;color:#333;}
+    .modal-body{padding:22px;overflow-x:auto;}
+
+    /* VERDICT BADGE */
+    .verdict-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:99px;font-size:12px;font-weight:600;}
+    .vb-valid{background:var(--green-bg);color:#1a7a45;border:0.5px solid #b8e6cc;}
+    .vb-invalid{background:var(--red-bg);color:#8b0000;border:0.5px solid #f5b8b8;}
+
+    /* MODAL STATS */
+    .modal-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+    .mstat{background:var(--surface);border-radius:9px;padding:12px;text-align:center;}
+    .mstat-num{font-size:18px;font-weight:600;color:#1a1a1a;}
+    .mstat-num.gold{color:var(--gold-dark);}
+    .mstat-num.green{color:var(--green);}
+    .mstat-num.red{color:var(--red);}
+    .mstat-lbl{font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;}
+
+    /* RESULTS TABLE */
+    .res-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
+    .res-table th{background:var(--surface);padding:9px 10px;text-align:left;font-weight:500;color:var(--gray);font-size:10px;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border);}
+    .res-table td{padding:9px 10px;border-bottom:0.5px solid var(--border);vertical-align:top;color:#2d3748;}
+    .res-table tr:last-child td{border-bottom:none;}
+    .res-table th:nth-child(1),  .res-table td:nth-child(1){width:36px;}
+    .res-table th:nth-child(3),  .res-table td:nth-child(3){width:120px;}
+    .res-table th:nth-child(4),
+    .res-table td:nth-child(4){width:90px;}
+    
+    .res-table th:nth-child(5),
+    .res-table td:nth-child(5){width:120px;}
+    
+    .res-table th:nth-child(6),
+    .res-table td:nth-child(6){width:90px;}
+    
+    .res-table th:nth-child(7),
+    .res-table td:nth-child(7){width:110px;}
+
+    .vbadge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:600;}
+    .vb-confirmed{background:var(--green-bg);color:#1a7a45;border:0.5px solid #b8e6cc;}
+    .vb-disputed{background:var(--red-bg);color:#8b0000;border:0.5px solid #f5b8b8;}
+    .vb-no-ev{background:var(--surface);color:var(--gray);border:0.5px solid var(--border);}
+
+    .cause-tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;margin:1px;background:var(--red-bg);color:#8b0000;border:0.5px solid #f5b8b8;}
+    .meta-pill{display:inline-block;font-size:10px;padding:1px 7px;border-radius:99px;margin:1px;font-weight:600;}
+    .meta-ok{background:var(--green-bg);color:#1a7a45;}
+    .meta-fail{background:var(--red-bg);color:#8b0000;}
+    .meta-na{background:var(--surface);color:var(--gray);}
+
+    .pct-mini-bar{height:4px;background:#eee;border-radius:99px;overflow:hidden;margin-top:3px;}
+    .pct-mini-fill{height:100%;border-radius:99px;}
+
+    /* EMPTY STATE */
+    .empty-state{text-align:center;padding:60px 20px;color:var(--gray);}
+    .empty-state p{font-size:14px;margin-top:8px;}
+
+    /* RELATIVE wrapper so modal overlay covers content */
+    .page-wrap{position:relative;}
   </style>
 </head>
 <body>
+<div class="page-wrap" id="pageWrap">
 <div class="container">
   <div class="header">
-    <div class="header-left">
-      <h1>📋 PM Report Validator</h1>
-      <p>Upload PDF, then pick the folder containing photo subfolders (1, 2, 3...).</p>
+    <div class="logo">
+      <div class="logo-icon">📋</div>
+      <div>
+        <h1>PM Report Batch Validator</h1>
+        <p>Irancell Preventive Maintenance — Multi-file processor</p>
+      </div>
     </div>
-    <a href="index.html" class="back-btn">← Back to Tasks</a>
+    <a href="index.html" style="padding:8px 14px;background:var(--white);border:0.5px solid var(--border);border-radius:8px;font-size:12px;color:#333;text-decoration:none;">← Back to Tasks</a>
   </div>
 
-  <div class="steps">
-    <div class="step active" id="step1-ind"><div class="step-num">1</div><div class="step-label">Upload PDF</div></div>
-    <div class="step-divider" id="div1"></div>
-    <div class="step active" id="step2-ind"><div class="step-num">2</div><div class="step-label">Parsed Data</div></div>
-    <div class="step-divider" id="div2"></div>
-    <div class="step" id="step3-ind"><div class="step-num">3</div><div class="step-label">Site Photos</div></div>
-    <div class="step-divider" id="div3"></div>
-    <div class="step" id="step4-ind"><div class="step-num">4</div><div class="step-label">AI Validation</div></div>
-    <div class="step-divider" id="div4"></div>
-    <div class="step" id="step5-ind"><div class="step-num">5</div><div class="step-label">Result</div></div>
+  <!-- DIRECTORY PICKER -->
+  <div class="dir-card">
+    <div class="logo-icon" style="background:var(--surface);border:0.5px solid var(--border);color:#555;font-size:16px;">📁</div>
+    <div class="dir-path empty" id="dirPath">No folder selected — click "Select Folder" to begin</div>
+    <button class="btn-pick" onclick="document.getElementById('folderInput').click()">Select Folder</button>
+    <button class="btn-run" id="btnRun" disabled onclick="startBatch()">▶ Run All</button>
+    <input type="file" id="folderInput" webkitdirectory multiple accept=".pdf" style="display:none"/>
   </div>
 
-  <div class="card" id="card-upload">
-    <h2>Step 1 — Upload PM Report PDF</h2>
-    <div class="upload-zone" onclick="document.getElementById('pdfInput').click()">
-      <p>📄 Click to upload PM Report PDF</p>
-    </div>
-    <input type="file" id="pdfInput" accept=".pdf" style="display:none"/>
+  <!-- SUMMARY -->
+  <div class="summary-row" id="summaryRow" style="display:none">
+    <div class="stat-card"><div class="stat-num gold" id="sumTotal">0</div><div class="stat-lbl">Total Files</div></div>
+    <div class="stat-card"><div class="stat-num green" id="sumDone">0</div><div class="stat-lbl">Completed</div></div>
+    <div class="stat-card"><div class="stat-num red" id="sumDisputed">0</div><div class="stat-lbl">Disputed</div></div>
+    <div class="stat-card"><div class="stat-num gold" id="sumAvgPct">—</div><div class="stat-lbl">Avg Confirmation</div></div>
   </div>
 
-  <div class="card hidden" id="card-parsed">
-    <h2>Step 2 — Parsed Report Data</h2>
-    <div class="fields-grid" id="fieldsGrid"></div>
-    <table class="items-table">
-      <thead><tr><th style="width:36px">#</th><th>Description</th><th style="width:100px">Reported</th></tr></thead>
-      <tbody id="itemsBody"></tbody>
+  <!-- JOBS TABLE -->
+  <div class="table-wrap">
+    <table class="jobs-table">
+      <thead>
+        <tr>
+    <th class="col-id">File Name</th>
+    <th class="col-task">Task ID</th>
+    <th class="col-bar">Progress</th>
+    <th class="col-pct">Confirmation</th>
+    <th class="col-act">Report</th>
+        </tr>
+      </thead>
+      <tbody id="jobsBody">
+        <tr><td colspan="5" style="padding:0;border:none;">
+          <div class="empty-state">
+            <div style="font-size:32px">📂</div>
+            <p>Select a folder containing PM Report PDF files to get started.</p>
+          </div>
+        </td></tr>
+      </tbody>
     </table>
   </div>
+</div>
 
-  <div class="card hidden" id="card-images">
-    <h2>Step 3 — Link Site Photos via Folders</h2>
-    <div class="upload-zone" style="border-color:#ccc" onclick="document.getElementById('folderInput').click()">
-      <p>📁 Select Parent Folder (containing subfolders 1, 2, 3...)</p>
+<!-- MODAL OVERLAY (inside page-wrap so position:absolute works) -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <h2 id="modalTitle">Validation Report</h2>
+        <div id="modalVerdict" class="verdict-badge vb-valid">✓ Validated</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕ Close</button>
     </div>
-    <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none"/>
-    <div id="extractedGrid" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:15px"></div>
-    <button class="btn-validate" id="validateBtn" onclick="runValidation()" disabled style="margin-top:20px">🔍 Validate Report with AI</button>
+    <div class="modal-body">
+      <div class="modal-stats" id="modalStats"></div>
+      <div id="modalHeaderInfo" class="header-info-box"></div>
+      <div style="overflow-x:auto;">
+        <table class="res-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Item Description</th>
+              <th>Photo Checks</th>
+              <th>PDF Status</th>
+              <th>Status Match</th>
+              <th>AI Verdict</th>
+              <th>AI Explanation</th>
+            </tr>
+          </thead>
+          <tbody id="modalBody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
-
-  <div class="card hidden" id="card-progress">
-    <h2>Step 4 — AI Validation in Progress</h2>
-    <div class="loading-bar"><div class="loading-bar-fill" id="progressFill"></div></div>
-    <div id="progressMsg" style="text-align:center; font-size:13px; color:var(--gray);">Initialising...</div>
-  </div>
-
-  <div class="card hidden" id="card-results">
-    <h2>Step 5 — Validation Results</h2>
-    <div id="verdictBanner"></div>
-    <div class="stats-row" id="statsRow"></div>
-    <table class="items-table">
-      <thead><tr><th>#</th><th>Item</th><th>Photo Checks</th><th>PDF Result</th><th>AI Verdict</th><th>AI Explanation</th></tr></thead>
-      <tbody id="valBody"></tbody>
-    </table>
-  </div>
+</div>
 </div>
 
 <script>
 'use strict';
 
-/* ── CONFIG ── */
 const LLM_URL   = 'http://10.130.154.133:8000/v1/chat/completions';
 const LLM_MODEL = './';
 
+const MINIO_BASE = 'http://10.224.235.31:9000/pm-photos';
+const BASE_PHOTO_PATH = `${MINIO_BASE}/photos/`;    
+const EXTRACT_API = 'http://10.224.235.31:9700/extract';
+
 const SITES_DATA = [
-  { siteId:'225-Shahrekord-BSC', lat:32.31735333333334, lon:50.861 },
-  { siteId:'SITE002', lat:79,     lon:80 },
-  { siteId:'SITE003', lat:35.6995, lon:51.3380 },
+  {siteId:'225-Shahrekord-BSC',lat:32.31735333333334,lon:50.861},
+  {siteId:'SITE002',lat:79,lon:80},
+  {siteId:'SITE003',lat:35.6995,lon:51.3380},
+  {siteId:'E2782',lat:35.6995,lon:51.3380},
+  {siteId:'T3309',lat:35.6995,lon:51.3380},
+  {siteId:'E1048',lat:29.6372,lon:52.5223}, 
+  {siteId:'T8844',lat:31.290977,lon:52.48984},     
 ];
 
 let TASK_RULES = {};
+let jobs = [];
+let isRunning = false;
 
-const state = {
-  parsedHeader: {},
-  parsedItems:  [],
-  itemPhotoMap: {},
-  results:      [],
-  siteInfo:     null
-};
+/* ══ FOLDER PICKER ══ */
+document.getElementById('folderInput').addEventListener('change', e => {
+  const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  if (!files.length) return;
 
-/* ══════════════════════════════════════════════
-   STEP 1 — PDF UPLOAD & PARSE
-══════════════════════════════════════════════ */
-document.getElementById('pdfInput').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
+  const pathParts = files[0].webkitRelativePath.split('/');
+  const folderName = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : '(root)';
+  document.getElementById('dirPath').textContent = folderName + '  (' + files.length + ' PDF file' + (files.length !== 1 ? 's' : '') + ')';
+  document.getElementById('dirPath').classList.remove('empty');
+  document.getElementById('btnRun').disabled = false;
 
-     // WITH this:
-    const fileBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({
-      data: fileBuffer,
-      verbosity: 0,
-      isEvalSupported: false,
-      useWorkerFetch: false,
-      disableAutoFetch: false,
-      disableStream: false,
-      rangeChunkSize: 65536      // 64KB chunks
-    }).promise;
+  jobs = files.map(f => ({
+    file: f,
+    taskId: f.name.replace(/\.pdf$/i, ''),
+    status: 'pending',
+    pct: 0,
+    barLabel: 'Waiting…',
+    barClass: '',
+    confirmation: null,
+    results: [],
+    parsedItems: [],
+    parsedHeader: {},
+  }));
 
-  // ── Parse header fields from raw text ──
-  let fullText = '';
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const tc = await (await pdf.getPage(p)).getTextContent();
-    fullText += tc.items.map(i => i.str).join('\n') + '\n\f\n';
-  }
-
-  const headerKeys = {
-    'Task ID:'         : 'taskId',
-    'Task Category:'   : 'taskCategory',
-    'Task Subcategory:': 'taskSubcategory',
-    'Site ID:'         : 'siteId',
-    'Report Date:'     : 'reportDate',
-    'Report FME:'      : 'fmeName'
-  };
-  const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
-  for (let i = 0; i < lines.length; i++) {
-    for (const [label, key] of Object.entries(headerKeys)) {
-      if (lines[i].startsWith(label))
-        state.parsedHeader[key] = lines[i].replace(label, '').trim() || (lines[i + 1] || '').trim();
-    }
-  }
-
-  const tasks    = await extractTasksFromPdf(pdf);   // same for both languages
-  const llmItems = await extractItemsWithBatching(tasks); // same for both
-  state.parsedItems = tasks.map(task => {
-    const match = llmItems.find(l => parseInt(l.num) === parseInt(task.num));
-    return {
-      num:    task.num,
-      desc:   match?.desc ?? task.desc,
-      result: task.result ?? 'NOT_OK'
-    };
-  });
-
-  console.log('Parsed items:', state.parsedItems);
-  state.siteInfo = SITES_DATA.find(
-    s => s.siteId.toUpperCase() === (state.parsedHeader.siteId || '').toUpperCase()
-  ) || null;
-
-  renderParsedData();
+  document.getElementById('summaryRow').style.display = 'grid';
+  renderJobsTable();
+  updateSummary();
 });
 
-/* ══════════════════════════════════════════════
-   PDF COORDINATE-BASED TASK EXTRACTOR
+/* ══ RENDER JOBS TABLE ══ */
+function renderJobsTable() {
+  const tbody = document.getElementById('jobsBody');
+  if (!jobs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:0;border:none;"><div class="empty-state"><div style="font-size:32px">📂</div><p>Select a folder containing PM Report PDF files to get started.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = jobs.map((job, idx) => {
+    const pctHtml = job.confirmation !== null
+      ? `<div class="pct-cell ${job.confirmation >= 80 ? 'high' : job.confirmation >= 50 ? 'mid' : 'low'}">${job.confirmation}%</div>`
+      : `<div class="pct-cell na">—</div>`;
+    const btnHtml = job.status === 'done'
+      ? `<button class="btn-view ready" onclick="openModal(${idx})">View Report →</button>`
+      : job.status === 'error'
+      ? `<span style="font-size:11px;color:var(--red)">Error</span>`
+      : `<button class="btn-view" disabled>—</button>`;
+    const fillClass = job.status === 'done' ? ' done' : job.status === 'error' ? ' error' : '';
+    return `<tr>
+    
+      <td class="col-id"
+          style="font-family:monospace;font-size:12px;font-weight:500;">
+        ${escHtml(job.file.name)}
+      </td>
+    
+      <td class="col-task"
+          style="font-family:monospace;font-size:12px;color:#555;">
+        ${escHtml(job.parsedHeader?.taskId || '—')}
+      </td>
+    
+      <td class="col-bar">
+        <div class="bar-wrap">
+          <div class="bar-track">
+            <div class="bar-fill${fillClass}"
+                 style="width:${job.pct}%">
+            </div>
+          </div>
+    
+          <span class="bar-label">
+            ${escHtml(job.barLabel)}
+          </span>
+        </div>
+      </td>
+    
+      <td class="col-pct">
+        ${pctHtml}
+      </td>
+    
+      <td class="col-act">
+        ${btnHtml}
+      </td>
+    
+    </tr>`;
+  }).join('');
+}
 
-   WHY DUPLICATES HAPPENED:
-   ─────────────────────────────────────────────
-   Each task in the Irancell PDF is rendered in 3 rows:
-     Row A: description text  |  "ok" plain text
-     Row B: description text  |  ☑OK  □Not OK   ← real checkbox row
-     Row C: description text  |  photos
+function updateJobRow(idx) {
+  const tbody = document.getElementById('jobsBody');
+  const rows = tbody.querySelectorAll('tr');
+  if (rows[idx]) {
+    const job = jobs[idx];
+    const pctHtml = job.confirmation !== null
+      ? `<div class="pct-cell ${job.confirmation >= 80 ? 'high' : job.confirmation >= 50 ? 'mid' : 'low'}">${job.confirmation}%</div>`
+      : `<div class="pct-cell na">—</div>`;
+    const btnHtml = job.status === 'done'
+      ? `<button class="btn-view ready" onclick="openModal(${idx})">View Report →</button>`
+      : job.status === 'error'
+      ? `<span style="font-size:11px;color:var(--red)">Error</span>`
+      : `<button class="btn-view" disabled>—</button>`;
+    const fillClass = job.status === 'done' ? ' done' : job.status === 'error' ? ' error' : '';
+    rows[idx].innerHTML = `
+    
+      <td class="col-id"
+          style="font-family:monospace;font-size:12px;font-weight:500;">
+        ${escHtml(job.file.name)}
+      </td>
+    
+      <td class="col-task"
+          style="font-family:monospace;font-size:12px;color:#555;">
+        ${escHtml(job.parsedHeader?.taskId || '—')}
+      </td>
+    
+      <td class="col-bar">
+        <div class="bar-wrap">
+    
+          <div class="bar-track">
+            <div class="bar-fill${fillClass}"
+                 style="width:${job.pct}%">
+            </div>
+          </div>
+    
+          <span class="bar-label">
+            ${escHtml(job.barLabel)}
+          </span>
+    
+        </div>
+      </td>
+    
+      <td class="col-pct">
+        ${pctHtml}
+      </td>
+    
+      <td class="col-act">
+        ${btnHtml}
+      </td>
+    `;
+  }
+  updateSummary();
+}
 
-   All three rows contain the description text.
-   Rows A and C also contain the text "Not OK" as a column label.
-   The old code anchored on EVERY "Not OK" token = 3 anchors per task
-   = 3 boundary zones = 3 duplicate extractions per task.
+function updateSummary() {
+  const done = jobs.filter(j => j.status === 'done').length;
+  const disputed = jobs.filter(j => j.status === 'done' && j.confirmation !== null && j.confirmation < 100).length;
+  const pcts = jobs.filter(j => j.confirmation !== null).map(j => j.confirmation);
+  const avg = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+  document.getElementById('sumTotal').textContent = jobs.length;
+  document.getElementById('sumDone').textContent = done;
+  document.getElementById('sumDisputed').textContent = disputed;
+  document.getElementById('sumAvgPct').textContent = avg !== null ? avg + '%' : '—';
+}
 
-   FIX:
-   ─────────────────────────────────────────────
-   Only treat a "Not OK" as a task boundary when an "OK" token exists
-   at the SAME Y coordinate (±5 px). That condition is true ONLY for
-   Row B (the actual checkbox row), never for rows A or C.
-   Result: exactly 1 anchor per task = correct task count.
-══════════════════════════════════════════════ */
+function setJob(idx, updates) {
+  Object.assign(jobs[idx], updates);
+  updateJobRow(idx);
+}
+
+/* ══ BATCH RUNNER ══ */
+async function startBatch() {
+  if (isRunning) return;
+  isRunning = true;
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('btnRun').textContent = '⏳ Running…';
+
+  for (let i = 0; i < jobs.length; i++) {
+    if (jobs[i].status === 'done') continue;
+    await processJob(i);
+  }
+
+  isRunning = false;
+  document.getElementById('btnRun').textContent = '✓ Done';
+}
+
+async function processJob(idx) {
+  const job = jobs[idx];
+  setJob(idx, {
+    status: 'running',
+    pct: 2,
+    barLabel: 'Generating photos...'
+});
+
+const formData = new FormData();
+
+formData.append('file', job.file);
+
+console.log('Uploading PDF to extractor...');
+
+const extractResp = await fetch(EXTRACT_API, {
+    method: 'POST',
+    body: formData
+});
+
+console.log('Extractor response status:', extractResp.status);
+
+// const extractData = await extractResp.json();
+
+// console.log('Extractor response:', extractData);
+
+// if (!extractResp.ok) {
+//     throw new Error('Photo extraction failed');
+// }
+
+// if (!extractData.success) {
+//     throw new Error(extractData.error || 'Extraction failed');
+// }
+
+// console.log('Extraction complete');
+
+// if (!extractResp.ok) {
+//     throw new Error('Photo extraction failed');
+// }
+
+const extractData = await extractResp.json();
+
+if (!extractData.success) {
+    throw new Error(extractData.error || 'Extraction failed');
+}
+  try {
+    setJob(idx, {status:'running', pct:5, barLabel:'Reading PDF…'});
+
+    const fileBuffer = await job.file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({
+      data:fileBuffer, verbosity:0, isEvalSupported:false,
+      useWorkerFetch:false, disableAutoFetch:false, disableStream:false, rangeChunkSize:65536
+    }).promise;
+
+    let fullText = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const tc = await (await pdf.getPage(p)).getTextContent();
+      fullText += tc.items.map(i => i.str).join('\n') + '\n\f\n';
+    }
+
+    const headerKeys = {
+      'Task ID:':'taskId','Task Category:':'taskCategory','Task Subcategory:':'taskSubcategory',
+      'Site ID:':'siteId','Report Date:':'reportDate','Report FME:':'fmeName'
+    };
+    const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+    for (let i = 0; i < lines.length; i++) {
+      for (const [label, key] of Object.entries(headerKeys)) {
+        if (lines[i].startsWith(label))
+          job.parsedHeader[key] = lines[i].replace(label,'').trim() || (lines[i+1]||'').trim();
+      }
+    }
+
+    const resolvedTaskId = job.parsedHeader.taskId || job.taskId;
+    setJob(idx, {pct:15, barLabel:'Extracting items…'});
+
+    const tasks = await extractTasksFromPdf(pdf);
+    const llmItems = await extractItemsWithBatching(tasks);
+    job.parsedItems = tasks.map(task => {
+      const match = llmItems.find(l => parseInt(l.num) === parseInt(task.num));
+      return {num:task.num, desc:match?.desc??task.desc, result:task.result??'NOT_OK'};
+    });
+
+    const siteInfo = SITES_DATA.find(s => s.siteId.toUpperCase() === (job.parsedHeader.siteId||'').toUpperCase()) || null;
+
+    setJob(idx, {pct:40, barLabel:'Loading photos…'});
+    const itemPhotoMap = {};
+    await Promise.all(job.parsedItems.map(async item => {
+      const folderPath = `${BASE_PHOTO_PATH}${resolvedTaskId}/${item.num}/`;
+
+    const images = [];
+    
+    for (let i = 1; i <= 50; i++) {   // safety upper bound
+      const url = `${folderPath}${i}.jpg`;
+      const b64 = await fetchImageAsBase64(url);
+    
+      if (!b64) break; // stop when no more images
+    
+      images.push({
+        name: `${i}.jpg`,
+        base64: b64
+      });
+    }
+    
+    if (images.length > 0) {
+      itemPhotoMap[item.num] = images;
+    }
+    }));
+
+    setJob(idx, {pct:55, barLabel:'AI validation…'});
+    const results = await runValidation(job.parsedItems, itemPhotoMap, job.parsedHeader, siteInfo, (i, total) => {
+      const p = 55 + Math.round((i / total) * 35);
+      setJob(idx, {pct: p, barLabel: `Validating ${i}/${total}…`});
+    });
+
+    job.results = results;
+
+    const confirmed = results.filter(r => r.verdict === 'CONFIRMED').length;
+    const total = results.length;
+    const confirmation = total > 0 ? Math.round(confirmed / total * 100) : 0;
+
+    setJob(idx, {status:'done', pct:100, barLabel:'Complete', confirmation});
+  } catch (err) {
+    console.error('Job error:', err);
+    setJob(idx, {status:'error', pct:100, barLabel:'Failed: ' + err.message});
+  }
+}
+
+/* ══ PDF PARSING ══ */
 async function extractTasksFromPdf(pdf) {
-  const tasks = [];
-  let taskCounter = 1;
-
+  const tasks = []; let taskCounter = 1;
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const tc   = await page.getTextContent();
-
-    const items = tc.items
-      .map(it => ({ str: (it.str || '').trim(), x: it.transform[4], y: it.transform[5] }))
-      .filter(it => it.str);
-
-    const okItems        = items.filter(it => /^ok$/i.test(it.str));
-    const checkboxNotOks = items
-      .filter(it => /Not\s*Ok/i.test(it.str))
-      .filter(notOk => okItems.some(ok => Math.abs(ok.y - notOk.y) <= 10));
-
+    const items = tc.items.map(it => ({str:(it.str||'').trim(), x:it.transform[4], y:it.transform[5]})).filter(it => it.str);
+    const okItems = items.filter(it => /^ok$/i.test(it.str));
+    const checkboxNotOks = items.filter(it => /Not\s*Ok/i.test(it.str)).filter(notOk => okItems.some(ok => Math.abs(ok.y - notOk.y) <= 10));
     if (!checkboxNotOks.length) { page.cleanup(); continue; }
-
-    const anchorYs   = checkboxNotOks.map(it => it.y).sort((a, b) => b - a);
+    const anchorYs = checkboxNotOks.map(it => it.y).sort((a, b) => b - a);
     const boundaries = anchorYs.map((y, i) => ({
-      anchorY: y,
-      top:    i === 0                   ? 1e5  : (anchorYs[i - 1] + y) / 2,
-      bottom: i === anchorYs.length - 1 ? -1e5 : (y + anchorYs[i + 1]) / 2,
+      anchorY:y,
+      top:i===0?1e5:(anchorYs[i-1]+y)/2,
+      bottom:i===anchorYs.length-1?-1e5:(y+anchorYs[i+1])/2
     }));
-
-    // ── Get checkbox strips for ALL tasks on this page in parallel ──
     const strips  = await getCheckboxStripImage(pdf, pageNum, anchorYs);
     const results = await Promise.all(strips.map(detectCheckboxFromStrip));
-    console.log(`Page ${pageNum} checkbox results:`, results);
-
     for (let bi = 0; bi < boundaries.length; bi++) {
-      const { top, bottom } = boundaries[bi];
-      const result = results[bi] ?? 'OK';
-
-      const box = items
-        .filter(it => it.y < top && it.y > bottom)
-        .filter(it => it.y > (bottom + 10))
-        .filter(it => !/(^|\b)(ok|not\s*ok)(\b|$)|☑|☐|✓|✗/i.test(it.str));
-
+      const {top, bottom} = boundaries[bi]; const result = results[bi] ?? 'OK';
+      const box = items.filter(it => it.y<top && it.y>bottom).filter(it => it.y>(bottom+10)).filter(it => !/(^|\b)(ok|not\s*ok)(\b|$)|☑|☐|✓|✗/i.test(it.str));
       box.sort((a, b) => Math.abs(a.y - b.y) > 3 ? a.y - b.y : b.x - a.x);
       const desc = box.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
-
-      if (desc.length > 5) {
-        console.log(`  Task ${taskCounter}: vision strip → ${result}`);
-        tasks.push({ num: taskCounter++, desc, result });
-      }
+      if (desc.length > 5) tasks.push({num:taskCounter++, desc, result});
     }
     page.cleanup();
   }
-
   await pdf.destroy();
   return tasks;
 }
 
-/* ── Extract all AcroForm checkbox fields from PDF ── */
-async function extractFormFields(pdf) {
-  const fields = [];
-  try {
-    const fieldObjects = await pdf.getFieldObjects();
-    console.log('Raw field objects:', fieldObjects);
-
-    if (!fieldObjects) return fields;
-
-    for (const [name, fieldArray] of Object.entries(fieldObjects)) {
-      for (const field of fieldArray) {
-        fields.push({
-          name,
-          type:  field.type,
-          value: field.value,      // "On", "Off", "Yes", "No", or custom
-          page:  field.page + 1,   // pdf.js uses 0-based page index
-          x:     field.rect?.[0],
-          y:     field.rect?.[1],
-        });
-      }
-    }
-  } catch (err) {
-    console.warn('getFieldObjects failed:', err);
-  }
-  return fields;
-}
-
-/* ══════════════════════════════════════════════
-   SMART CHUNKING — one LLM call per task block
-══════════════════════════════════════════════ */
 async function getCheckboxStripImage(pdf, pageNum, anchorYs) {
-  const page     = await pdf.getPage(pageNum);
-  const viewport = page.getViewport({ scale: 2.0 });
-
-  const canvas    = document.createElement('canvas');
-  canvas.width    = viewport.width;
-  canvas.height   = viewport.height;
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-
-  // ── Crop ONLY the checkbox column (x=185-305 in PDF units, scaled ×2) ──
-  // This is a narrow vertical strip containing just OK / Not OK checkboxes
-  const SCALE   = 2;
-  const cropX   = 170 * SCALE;   // left edge of checkbox area
-  const cropW   = 160 * SCALE;   // width covering OK + Not OK columns
-  const PADDING = 30 * SCALE;    // vertical padding around each checkbox row
-
-  // One strip per anchor Y — tiny image per task
-  const strips = [];
-  for (const anchorY of anchorYs) {
-    // PDF y=0 is bottom — flip to canvas coords
-    const canvasY = viewport.height - (anchorY * SCALE) - PADDING;
-    const cropH   = PADDING * 2;
-
-    const strip   = document.createElement('canvas');
-    strip.width   = cropW;
-    strip.height  = cropH;
+  const page = await pdf.getPage(pageNum); const viewport = page.getViewport({scale:2.0});
+  const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height;
+  await page.render({canvasContext:canvas.getContext('2d'), viewport}).promise;
+  const SCALE=2, cropX=170*SCALE, cropW=160*SCALE, PADDING=30*SCALE;
+  return anchorYs.map(anchorY => {
+    const canvasY = viewport.height - (anchorY*SCALE) - PADDING, cropH = PADDING*2;
+    const strip = document.createElement('canvas'); strip.width = cropW; strip.height = cropH;
     strip.getContext('2d').drawImage(canvas, cropX, canvasY, cropW, cropH, 0, 0, cropW, cropH);
-
-    strips.push(strip.toDataURL('image/jpeg', 0.9));
-  }
-
-  return strips;
+    return strip.toDataURL('image/jpeg', 0.9);
+  });
 }
 
 async function detectCheckboxFromStrip(stripBase64) {
-  const prompt = `This image shows a single checkbox row from a maintenance report.
-It contains two checkboxes: one for "OK" and one for "Not OK".
-Look carefully at which checkbox has a checkmark/tick inside it.
-
-Return ONLY one of these two values, nothing else:
-OK
-NOT_OK`;
-
+  const prompt = `This image shows a single checkbox row from a maintenance report. It contains two checkboxes: one for "OK" and one for "Not OK". Look carefully at which checkbox has a checkmark/tick inside it.\nReturn ONLY one of these two values, nothing else:\nOK\nNOT_OK`;
   try {
-    const res = await fetch(LLM_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: LLM_MODEL,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text',      text: prompt },
-            { type: 'image_url', image_url: { url: stripBase64 } }
-          ]
-        }],
-        temperature: 0
-      })
-    });
-    const data   = await res.json();
-    const answer = (data.choices?.[0]?.message?.content || '').trim().toUpperCase();
+    const res = await fetch(LLM_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:LLM_MODEL, messages:[{role:'user', content:[{type:'text', text:prompt}, {type:'image_url', image_url:{url:stripBase64}}]}], temperature:0})});
+    const data = await res.json(); const answer = (data.choices?.[0]?.message?.content||'').trim().toUpperCase();
     return answer.includes('NOT_OK') ? 'NOT_OK' : 'OK';
-  } catch (err) {
-    console.error('Strip vision error:', err);
-    return 'OK';
-  }
+  } catch { return 'OK'; }
 }
+
 function dedupeItems(items) {
   const seen = new Map();
-
   items.forEach(item => {
     if (!item.desc) return;
-
-    const normalizedDesc = item.desc
-      .trim()
-      .replace(/[\u200c\u200b\u200e\u200f]/g, '')
-      .replace(/\s+/g, '')
-      .replace(/[.,،;؛]/g, '');
-
-    const key = item.num + '|' + normalizedDesc; // ✅ مهم
-
-    if (!seen.has(key)) {
-      seen.set(key, item);
-    }
+    const key = item.num + '|' + item.desc.trim().replace(/[\u200c\u200b\u200e\u200f]/g,'').replace(/\s+/g,'').replace(/[.,،;؛]/g,'');
+    if (!seen.has(key)) seen.set(key, item);
   });
+  return Array.from(seen.values()).sort((a, b) => a.num - b.num);
+}
 
-  return Array.from(seen.values())
-    .sort((a, b) => a.num - b.num);
-}    
 async function extractItemsWithBatching(tasks) {
-  const CHUNK_SIZE = 5; // 🔥 خیلی مهم — میتونی 4 تا 7 تست کنی
-  let allItems = [];
-
+  const CHUNK_SIZE = 5; let allItems = [];
   for (let i = 0; i < tasks.length; i += CHUNK_SIZE) {
     const batch = tasks.slice(i, i + CHUNK_SIZE);
-
-    const text = batch
-      .map(t => `${t.num}. ${t.desc}\nNot OK`)
-      .join('\n');
-
-    console.log(`LLM batch ${i / CHUNK_SIZE + 1}: items ${batch[0].num}-${batch[batch.length - 1].num}`);
-
+    const text = batch.map(t => `${t.num}. ${t.desc}\nNot OK`).join('\n');
     const results = await callLLMExtract(text);
-
-    // ⛑️ fail-safe
-    if (!results.length) {
-      console.warn('Empty LLM result, using fallback for batch');
-      allItems.push(...batch.map(t => ({
-        num: t.num,
-        desc: t.desc,
-        result: 'NOT_OK'
-      })));
-      continue;
-    }
-
+    if (!results.length) { allItems.push(...batch.map(t => ({num:t.num, desc:t.desc, result:'NOT_OK'}))); continue; }
     allItems.push(...results);
   }
-
   return dedupeItems(allItems);
 }
-    
-async function extractItemsWithSmartChunking(fullText) {
-  const rawChunks = fullText.split(/not\s*ok/i).map(c => c.trim()).filter(Boolean);
-  console.log(`Smart chunking: ${rawChunks.length} chunks`);
 
-  const allItems = [];
-  for (let i = 0; i < rawChunks.length; i++) {
-    const clean = preprocessText(rawChunks[i]);
-    if (!clean) continue;
-    const results = await callLLMExtract(clean);
-    allItems.push(...results);
-  }
-
-// Deduplicate by description, renumber
-    const seen = new Map();
-      allItems.forEach(item => {
-        if (item.desc) {
-          // نرمال‌سازی فوق‌العاده دقیق برای زبان فارسی
-          const normalizedDesc = item.desc
-            .trim()
-            .replace(/[\u200c\u200b\u200e\u200f]/g, '') // ۱. حذف نیم‌فاصله و کاراکترهای نامرئی کنترل جهت
-            .replace(/\s+/g, '')                      // ۲. حذف تمام فاصله‌ها (چسباندن کلمات به هم برای مقایسه)
-            .replace(/[.,،;؛]/g, '')                   // ۳. حذف تمام علائم نگارشی (نقطه، ویرگول و...)
-            .replace(/ی/g, 'ی').replace(/ک/g, 'ک');    // ۴. یکسان‌سازی ی و ک (اگر از فونت‌های مختلف باشند)
-    
-          // ذخیره در Map؛ اگر متن (بدون فاصله و نیم‌فاصله) تکراری باشد، نادیده گرفته می‌شود
-          if (!seen.has(normalizedDesc)) {
-            seen.set(normalizedDesc, item);
-          }
-        }
-      });
-    
-      return Array.from(seen.values()).map((item, i) => ({ 
-        ...item, 
-        num: i + 1 
-      }));
+async function callLLMExtract(textChunk) {
+  const prompt = `The following text is raw extraction from a PDF maintenance report. It may be in Persian or English.\nTASK:\n1. If Persian: fix character shaping and joining.\n2. If English: fix any broken words.\n3. Extract each unique maintenance task description cleanly.\n4. Return ONLY a JSON array — no markdown, no preamble.\n\nFormat: [{"num":1,"desc":"clean task description","result":"NOT_OK"}]\n\nRules:\n- Ignore header lines (Site ID, Contractor, Region, Task ID, etc.)\n- Do not duplicate sentences\n\nRAW TEXT:\n${textChunk}`;
+  try {
+    const res = await fetch(LLM_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:LLM_MODEL, messages:[{role:'user', content:prompt}], temperature:0.1})});
+    if (!res.ok) return [];
+    const data = await res.json(); const raw = data.choices?.[0]?.message?.content || '';
+    const match = raw.match(/\[[\s\S]*\]/); return match ? JSON.parse(match[0]) : [];
+  } catch { return []; }
 }
 
-/* ══════════════════════════════════════════════
-   LLM EXTRACTION CALL
-══════════════════════════════════════════════ */
-async function callLLMExtract(textChunk) {
-  const prompt = `
-The following text is raw extraction from a PDF maintenance report.
-It may be in Persian or English.
 
-TASK:
-1. If Persian: fix character shaping and joining.
-2. If English: fix any broken words, extra spaces, or garbled text from PDF extraction.
-2. If English: tasks start with numbers. consider highest number task.
-3. Extract each unique maintenance task description cleanly.
-4. Return ONLY a JSON array — no markdown, no preamble.
 
-Format: [{"num": 1, "desc": "clean task description", "result": "NOT_OK"}]
-
-Rules:
-- desc must be clean text (Persian or English)
-- Ignore header lines (Site ID, Contractor, Region, Task ID, Report Date, etc.)
-- Do not duplicate sentences
-- Do not merge separate tasks into one
-
-RAW TEXT:
-${textChunk}`;
+    
+/* ══ PHOTOS ══ */
+async function fetchImageAsBase64(url) {
 
   try {
-    const res = await fetch(LLM_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: LLM_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1
-      })
+
+    const resp = await fetch(url);
+
+    if (!resp.ok) return null;
+
+    const blob = await resp.blob();
+
+    return await new Promise(resolve => {
+
+      const img = new Image();
+
+      img.onload = () => {
+
+        const canvas = document.createElement('canvas');
+
+        const MAX_W = 1000;
+
+        const scale = Math.min(
+          1,
+          MAX_W / img.width
+        );
+
+        canvas.width  = img.width * scale;
+        canvas.height = img.height * scale;
+
+        const ctx = canvas.getContext('2d');
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        resolve(
+          canvas.toDataURL(
+            'image/jpeg',
+            0.7
+          )
+        );
+      };
+
+      img.src = URL.createObjectURL(blob);
+
     });
-    if (!res.ok) { console.error('LLM HTTP error', res.status); return []; }
-    const data  = await res.json();
-    const raw   = data.choices?.[0]?.message?.content || '';
-    const match = raw.match(/\[[\s\S]*\]/);
-    return match ? JSON.parse(match[0]) : [];
-  } catch (err) {
-    console.error('LLM extraction error:', err);
-    return [];
+
+  } catch {
+
+    return null;
   }
 }
+/* ══ VALIDATION ══ */
+async function runValidation(parsedItems, itemPhotoMap, parsedHeader, siteInfo, onProgress) {
+  const results = [];
+  const siteLat = siteInfo?.lat ?? null, siteLon = siteInfo?.lon ?? null;
+  const reportDate = parsedHeader.reportDate || '';
+  const total = parsedItems.length;
 
-/* ══════════════════════════════════════════════
-   ENGLISH ITEM EXTRACTOR
-══════════════════════════════════════════════ */
-async function extractItemsEnglish(pdf) {
-  const tasks = [];
-  let taskCounter = 1;
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const tc   = await page.getTextContent();
-
-    const items = tc.items
-      .map(it => ({ str: (it.str || '').trim(), x: it.transform[4], y: it.transform[5] }))
-      .filter(it => it.str);
-
-    const okItems        = items.filter(it => /^ok$/i.test(it.str));
-    const checkboxNotOks = items
-      .filter(it => /Not\s*Ok/i.test(it.str))
-      .filter(notOk => okItems.some(ok => Math.abs(ok.y - notOk.y) <= 10));
-
-    if (!checkboxNotOks.length) { page.cleanup(); continue; }
-
-    const anchorYs   = checkboxNotOks.map(it => it.y).sort((a, b) => b - a);
-    const boundaries = anchorYs.map((y, i) => ({
-      anchorY: y,
-      top:    i === 0                   ? 1e5  : (anchorYs[i - 1] + y) / 2,
-      bottom: i === anchorYs.length - 1 ? -1e5 : (y + anchorYs[i + 1]) / 2,
-    }));
-
-    // ── Same checkbox vision strips as Persian ──
-    const strips  = await getCheckboxStripImage(pdf, pageNum, anchorYs);
-    const results = await Promise.all(strips.map(detectCheckboxFromStrip));
-    console.log(`Page ${pageNum} checkbox results:`, results);
-
-    for (let bi = 0; bi < boundaries.length; bi++) {
-      const { top, bottom } = boundaries[bi];
-      const result = results[bi] ?? 'OK';
-
-      const box = items
-        .filter(it => it.y < top && it.y > bottom)
-        .filter(it => it.y > (bottom + 10))
-        .filter(it => !/(^|\b)(ok|not\s*ok)(\b|$)|☑|☐|✓|✗/i.test(it.str));
-
-      box.sort((a, b) => Math.abs(a.y - b.y) > 3 ? a.y - b.y : b.x - a.x);
-
-      // ── No LLM cleanup needed — English text is already clean ──
-      const desc = box.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
-
-      if (desc.length > 5) {
-        console.log(`  Task ${taskCounter}: "${desc.slice(0, 40)}..." → ${result}`);
-        tasks.push({ num: taskCounter++, desc, result });
-      }
-    }
-    page.cleanup();
-  }
-
-  await pdf.destroy();
-  return tasks;
-}
-
-/* ══════════════════════════════════════════════
-   TEXT PREPROCESSING
-══════════════════════════════════════════════ */
-function preprocessText(text) {
-  return text
-    .normalize('NFKC')
-    .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
-    .replace(/[\u200c\u200f\u202a-\u202e]/g, '')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{2,}/g, '\n')
-    .split('\n')
-    .map(l => l.trim())
-    .filter((l, i, arr) => l && arr.indexOf(l) === i)
-    .join('\n')
-    .trim();
-}
-
-function detectPersian(text) {
-  return (text.match(/[\u0600-\u06FF]/g) || []).length > 50;
-}
-
-/* ══════════════════════════════════════════════
-   STEP 2 — RENDER PARSED DATA
-══════════════════════════════════════════════ */
-function renderParsedData() {
-  const h = state.parsedHeader;
-  const fieldDefs = [
-    { key:'taskId', label:'Task ID' }, { key:'siteId', label:'Site ID' },
-    { key:'reportDate', label:'Date' }, { key:'taskCategory', label:'Task Category' },
-    { key:'taskSubcategory', label:'Task Subcategory' }, { key:'fmeName', label:'Report FME' }
-  ];
-  document.getElementById('fieldsGrid').innerHTML = fieldDefs
-    .map(f => `<div class="field-box"><label>${f.label}</label><span>${h[f.key] || '—'}</span></div>`).join('');
-  document.getElementById('itemsBody').innerHTML = state.parsedItems
-    .map(i => `<tr><td>${i.num}</td><td>${i.desc}</td><td>${i.result === 'OK' ? '✅ OK' : '❌ Not OK'}</td></tr>`).join('');
-  show('card-parsed'); show('card-images'); setStep(3);
-}
-
-/* ══════════════════════════════════════════════
-   STEP 3 — FOLDER PICKER
-══════════════════════════════════════════════ */
-document.getElementById('folderInput').addEventListener('change', async e => {
-  const files = Array.from(e.target.files);
-  state.itemPhotoMap = {};
-  for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
-    const parts   = file.webkitRelativePath.split('/');
-    const itemNum = parseInt(parts[parts.length - 2]);
-    if (isNaN(itemNum)) continue;
-    if (!state.itemPhotoMap[itemNum]) state.itemPhotoMap[itemNum] = [];
-    const base64 = await new Promise(r => {
-      const rd = new FileReader(); rd.onload = ev => r(ev.target.result); rd.readAsDataURL(file);
-    });
-    state.itemPhotoMap[itemNum].push({ name: file.name, base64 });
-  }
-  document.getElementById('validateBtn').disabled = false;
-  const grid = document.getElementById('extractedGrid');
-  grid.innerHTML = '';
-  Object.keys(state.itemPhotoMap).forEach(n =>
-    state.itemPhotoMap[n].forEach(img => {
-      grid.innerHTML += `<div class="photo-thumb"><img src="${img.base64}"><div class="thumb-label">Item ${n}: ${img.name}</div></div>`;
-    })
-  );
-});
-
-/* ══════════════════════════════════════════════
-   STEP 4 — AI VALIDATION
-══════════════════════════════════════════════ */
-async function runValidation() {
-  show('card-progress'); setStep(4);
-  state.results = [];
-  const siteLat    = state.siteInfo?.lat ?? null;
-  const siteLon    = state.siteInfo?.lon ?? null;
-  const reportDate = state.parsedHeader.reportDate || '';
-
-  for (let i = 0; i < state.parsedItems.length; i++) {
-    const item   = state.parsedItems[i];
-    const photos = state.itemPhotoMap[item.num] || [];
-    const rule   = TASK_RULES?.[state.parsedHeader.taskCategory]?.[state.parsedHeader.taskSubcategory]?.[item.num] ?? null;
-
-    setProgress(Math.round(((i + 1) / state.parsedItems.length) * 100), `Validating item ${item.num}…`);
+  for (let i = 0; i < total; i++) {
+    const item = parsedItems[i];
+    const photos = itemPhotoMap[item.num] || [];
+    const rule = TASK_RULES?.[parsedHeader.taskCategory]?.[parsedHeader.taskSubcategory]?.[item.num] ?? null;
+    onProgress(i + 1, total);
 
     if (!photos.length) {
-      state.results.push({ row: item.num, verdict: 'NO_EVIDENCE', causes: [], explanation: `No photos in folder ${item.num}`, metaList: [] });
+      results.push({row:item.num, verdict:'NO_EVIDENCE', causes:[], explanation:`No photos in folder ${item.num}`, metaList:[]});
       continue;
     }
 
-    const metaList = await Promise.all(photos.map(extractImageMeta));
+    const metaList = await Promise.all(photos.map(p => extractImageMeta(p, item.num, parsedHeader.taskId)));
     const reportDateOnly = reportDate.match(/(\d{4}-\d{2}-\d{2})/)?.[1] || '';
 
     for (const m of metaList) {
-      if (reportDateOnly && m.date) {
+      if (m.date) {
         const diffDays = Math.abs(new Date(m.date) - new Date(reportDateOnly)) / 86400000;
-        m.dateOk    = diffDays <= 3;
-        m.dateLabel = m.dateOk ? `✓ ${m.date} (within 3 days)` : `✗ ${m.date} (${Math.round(diffDays)} days off)`;
-      } else {
-        m.dateOk    = null;
-        m.dateLabel = m.date ? `? ${m.date} (report date missing)` : '? no date in watermark';
-      }
+        m.dateOk = diffDays <= 3; m.dateLabel = m.dateOk ? `✓ ${m.date}` : `✗ ${m.date}`;
+      } else { m.dateOk = false; m.dateLabel = '✗ No JSON'; }
       if (siteLat != null && m.lat != null) {
-        m.dist     = Math.round(haversine(siteLat, siteLon, m.lat, m.lon));
-        m.gpsOk    = m.dist <= 300;
-        m.gpsLabel = m.gpsOk ? `✓ on-site (${m.dist} m)` : `✗ off-site (${m.dist} m away)`;
-      } else {
-        m.dist = null; m.gpsOk = null;
-        m.gpsLabel = m.lat != null ? '? site GPS not registered' : '? no GPS in watermark';
-      }
+        m.dist = Math.round(haversine(siteLat, siteLon, m.lat, m.lon));
+        m.gpsOk = m.dist <= 300;
+        m.gpsLabel = m.gpsOk ? `✓ On-site (${m.dist}m)` : `✗ Off-site (${m.dist}m)`;
+      } else { m.dist = null; m.gpsOk = false; m.gpsLabel = '✗ GPS missing'; }
     }
 
-    const metaSummary = metaList
-      .map(m => `  - ${m.name}: date=${m.dateLabel}, GPS=${m.lat != null ? `${m.lat},${m.lon}` : 'not found'}(${m.gpsLabel})`)
-      .join('\n');
+    const systemCauses = [];
+    for (const m of metaList) {
+      if (!m.dateOk) systemCauses.push('IMAGE_DATE_MISMATCH');
+      if (m.gpsOk === false) systemCauses.push(m.lat == null ? 'IMAGE_GPS_MISSING' : 'IMAGE_GPS_MISMATCH');
+    }
+
+    const metaSummary = metaList.map(m => `  - ${m.name}: date=${m.dateLabel}, GPS=${m.lat!=null?`${m.lat},${m.lon}`:'not found'}(${m.gpsLabel})`).join('\n');
 
     try {
       const content = [
-        { type: 'text', text: buildValidationPrompt(item, photos.length, reportDate, siteLat, siteLon, metaSummary, rule) },
-        ...photos.map(p => ({ type: 'image_url', image_url: { url: p.base64 } }))
+        {type:'text', text:buildValidationPrompt(item, photos.length, reportDate, siteLat, siteLon, metaSummary, rule, parsedHeader)},
+        ...photos.map(p => ({type:'image_url', image_url:{url:p.base64}}))
       ];
-      const raw   = await callLLM(content);
+      const raw = await callLLM(content);
       const match = raw.match(/\{[\s\S]*\}/);
       if (!match) throw new Error('No JSON in response');
-      state.results.push({ ...JSON.parse(match[0]), photoCount: photos.length, metaList });
+      const llmResult = JSON.parse(match[0]);
+               if (
+          llmResult.verdict === 'NO_EVIDENCE' &&
+          photos.length > 0
+        ) {
+          llmResult.verdict = 'DISPUTED';
+        } 
+      llmResult.causes = [...new Set([...systemCauses, ...(llmResult.causes||[])])];
+      results.push({...llmResult, photoCount:photos.length, metaList});
+        
     } catch (err) {
-      state.results.push({ row: item.num, verdict: 'NO_EVIDENCE', causes: [], explanation: `Validation error: ${err.message}`, metaList });
+      results.push({row:item.num, verdict:'NO_EVIDENCE', causes:[], explanation:`Validation error: ${err.message}`, metaList});
     }
   }
-  renderResults();
+  return results;
 }
 
-function buildValidationPrompt(item, photoCount, reportDate, siteLat, siteLon, metaSummary, rule) {
+function buildValidationPrompt(item, photoCount, reportDate, siteLat, siteLon, metaSummary, rule, parsedHeader) {
   const ruleText = rule
-    ? `EXPECTED CONDITION: ${rule.expected || '-'}\nCHECKPOINTS:\n${(rule.checkpoints||[]).map(c=>'- '+c).join('\n')}\nFAIL CONDITIONS:\n${(rule.fail_if||[]).map(f=>'- '+f).join('\n')}`
+    ? `EXPECTED CONDITION: ${rule.expected||'-'}\nCHECKPOINTS:\n${(rule.checkpoints||[]).map(c=>'- '+c).join('\n')}\nFAIL CONDITIONS:\n${(rule.fail_if||[]).map(f=>'- '+f).join('\n')}`
     : 'No additional rules provided.';
-
   return `You are an expert AI validator for Irancell PM (Preventive Maintenance) reports.
 TASK: Validate ONE checklist item using ONLY its dedicated site photos.
 
 REPORT:
-  Task ID:     ${state.parsedHeader.taskId || '?'}
-  Site ID:     ${state.parsedHeader.siteId || '?'}
+  Task ID:     ${parsedHeader.taskId||'?'}
+  Site ID:     ${parsedHeader.siteId||'?'}
   Report Date: ${reportDate}
-  Site GPS:    ${siteLat ? `${siteLat}, ${siteLon}` : 'not registered'}
+  Site GPS:    ${siteLat?`${siteLat}, ${siteLon}`:'not registered'}
 
 ITEM TO VALIDATE:
-  Row: ${item.num} | Description: ${item.desc} | Reported: ${item.result || 'NO_RESULT'} | Photos: ${photoCount}
+  Row: ${item.num} | Description: ${item.desc} | Reported: ${item.result||'NO_RESULT'} | Photos: ${photoCount}
 
 ADDITIONAL VALIDATION RULES:
 ${ruleText}
 
-PHOTO METADATA:
-${metaSummary}
+CRITICAL DATA for latitude and longitude (TRUST ONLY THIS):
+  ${metaSummary}
+
+IMPORTANT:
+Date and GPS validation are already handled by the system.
+
+DO NOT analyze:
+- dates visible inside images
+- timestamps
+- watermarks
+- GPS text
+- coordinates
+
+Only analyze:
+- whether the image is relevant
+- whether the maintenance condition matches the reported status
+- whether the photo quality is sufficient
 
 Determine:
 1. VERDICT: "CONFIRMED" | "DISPUTED" | "NO_EVIDENCE"
-2. CAUSES (only applicable): "IMAGE_DATE_MISMATCH" | "IMAGE_GPS_MISMATCH" | "IMAGE_GPS_MISSING" | "IRRELEVANT_IMAGE" | "MARKED_OK_BUT_DEFECT" | "MARKED_NOTOK_BUT_FINE" | "PHOTO_QUALITY"
-3. EXPLANATION: 1-2 sentences.
+2. CAUSES (only applicable):
+"IRRELEVANT_IMAGE" |
+"MARKED_OK_BUT_DEFECT" |
+"MARKED_NOTOK_BUT_FINE" |
+"PHOTO_QUALITY"
+3. EXPLANATION: 1-2 sentences in persian when task written in persian and english when task written in english.
 
 Return ONLY valid JSON (no markdown):
 {"row":${item.num},"verdict":"CONFIRMED","causes":[],"explanation":"…"}`;
 }
 
-/* ══════════════════════════════════════════════
-   IMAGE METADATA EXTRACTION
-══════════════════════════════════════════════ */
-async function extractImageMeta(img) {
+async function extractImageMeta(img, itemNum, taskId) {
+  // const jsonUrl = `http://10.224.235.31:9500/photos/${taskId}/${itemNum}/${img.name.replace(/\.[^/.]+$/,'.json')}`;
+const jsonUrl = `${MINIO_BASE}/photos/${taskId}/${itemNum}/${img.name.replace(/\.[^/.]+$/, '.json')}`;
   try {
-    const raw = await callLLM([
-      { type: 'text', text: 'Extract date (YYYY-MM-DD), latitude, longitude from image watermark. Return ONLY JSON: {"date":"...","latitude":0,"longitude":0}' },
-      { type: 'image_url', image_url: { url: img.base64 } }
-    ]);
-    const d = JSON.parse(raw.match(/\{[\s\S]*\}/)[0]);
-    return { name: img.name, date: d.date || null, lat: d.latitude || null, lon: d.longitude || null };
-  } catch {
-    return { name: img.name, date: null, lat: null, lon: null };
+    const response = await fetch(jsonUrl); let text = await response.text();
+    text = text.replace(/,\s*([\]}])/g,'$1').trim();
+    const data = JSON.parse(text);
+    return {
+  name: img.name,
+
+  date:
+    data.date ||
+    data.date_time ||
+    null,
+
+  lat:
+    parseFloat(
+      data.lat ||
+      data.latitude
+    ) || null,
+
+  lon:
+    parseFloat(
+      data.lng ||
+      data.longitude
+    ) || null
+};
+      console.log(
+  "META READ:",
+  img.name,
+  {
+    date:data.date || data.date_time,
+    lat:data.lat || data.latitude,
+    lon:data.lng || data.longitude
   }
+);
+  } catch { return {name:img.name, date:null, lat:null, lon:null}; }
 }
 
-/* ══════════════════════════════════════════════
-   STEP 5 — RENDER RESULTS
-══════════════════════════════════════════════ */
-function renderResults() {
-  hide('card-progress'); show('card-results'); setStep(5);
-  const confirmed = state.results.filter(r => r.verdict === 'CONFIRMED').length;
-  const disputed  = state.results.filter(r => r.verdict === 'DISPUTED').length;
-  const total     = state.results.length;
-  const validPct  = total > 0 ? Math.round(confirmed / total * 100) : 0;
+/* ══ MODAL ══ */
+function openModal(idx) {
+  const job = jobs[idx];
+  const results = job.results;
+  const h = job.parsedHeader || {};
+  const parsedItems = job.parsedItems;
 
-  document.getElementById('verdictBanner').innerHTML = `
-    <div class="verdict-banner ${disputed === 0 ? 'verdict-valid' : 'verdict-invalid'}">
-      <div style="font-size:20px;font-weight:bold">${disputed === 0 ? '✅ REPORT VALIDATED' : '❌ REPORT DISPUTED'}</div>
-      <div>${disputed === 0 ? 'All inspected items confirmed.' : `${disputed} item(s) disputed.`}</div>
-    </div>`;
+  const confirmed = results.filter(r => r.verdict === 'CONFIRMED').length;
+  const disputed  = results.filter(r => r.verdict === 'DISPUTED').length;
+  const total     = results.length;
+  const pct       = total > 0 ? Math.round(confirmed / total * 100) : 0;
 
-  document.getElementById('statsRow').innerHTML = `
-    <div class="stat-box"><div class="stat-num">${validPct}%</div><div class="stat-lbl">Confirmation</div></div>
-    <div class="stat-box"><div class="stat-num">${confirmed}</div><div class="stat-lbl">Confirmed</div></div>
-    <div class="stat-box"><div class="stat-num">${disputed}</div><div class="stat-lbl">Disputed</div></div>
-    <div class="stat-box"><div class="stat-num">${total}</div><div class="stat-lbl">Total</div></div>`;
+  document.getElementById('modalTitle').textContent = 'Report — ' + job.taskId;
+  const badge = document.getElementById('modalVerdict');
+  badge.className = 'verdict-badge ' + (disputed === 0 ? 'vb-valid' : 'vb-invalid');
+  badge.textContent = disputed === 0 ? '✓ Validated' : '✗ Disputed';
 
+  document.getElementById('modalStats').innerHTML = `
+    <div class="mstat"><div class="mstat-num gold">${pct}%</div><div class="mstat-lbl">Confirmation</div></div>
+    <div class="mstat"><div class="mstat-num green">${confirmed}</div><div class="mstat-lbl">Confirmed</div></div>
+    <div class="mstat"><div class="mstat-num red">${disputed}</div><div class="mstat-lbl">Disputed</div></div>
+    <div class="mstat"><div class="mstat-num">${total}</div><div class="mstat-lbl">Total Items</div></div>`;
+    document.getElementById('modalHeaderInfo').innerHTML = `
+      <div class="hinfo-item">
+        <div class="hinfo-label">Task ID</div>
+        <div class="hinfo-value">${escHtml(h.taskId || '-')}</div>
+      </div>
+    
+      <div class="hinfo-item">
+        <div class="hinfo-label">Site ID</div>
+        <div class="hinfo-value">${escHtml(h.siteId || '-')}</div>
+      </div>
+    
+      <div class="hinfo-item">
+        <div class="hinfo-label">Task Category</div>
+        <div class="hinfo-value">${escHtml(h.taskCategory || '-')}</div>
+      </div>
+    
+      <div class="hinfo-item">
+        <div class="hinfo-label">Task Subcategory</div>
+        <div class="hinfo-value">${escHtml(h.taskSubcategory || '-')}</div>
+      </div>
+    
+      <div class="hinfo-item">
+        <div class="hinfo-label">Report Date</div>
+        <div class="hinfo-value">${escHtml(h.reportDate || '-')}</div>
+      </div>
+    
+      <div class="hinfo-item">
+        <div class="hinfo-label">Report FME</div>
+        <div class="hinfo-value">${escHtml(h.fmeName || '-')}</div>
+      </div>
+    `;
   const causeLabels = {
-    IMAGE_DATE_MISMATCH:'📅 Date mismatch', IMAGE_GPS_MISMATCH:'📍 GPS mismatch',
-    IMAGE_GPS_MISSING:'📍 GPS missing', IRRELEVANT_IMAGE:'🖼️ Irrelevant image',
-    MARKED_OK_BUT_DEFECT:'⚠️ Marked OK but defect visible',
-    MARKED_NOTOK_BUT_FINE:'✅ Marked Not OK but looks fine', PHOTO_QUALITY:'📷 Poor photo quality',
+    IMAGE_DATE_MISMATCH:'Date mismatch', IMAGE_GPS_MISMATCH:'GPS mismatch',
+    IMAGE_GPS_MISSING:'GPS missing', IRRELEVANT_IMAGE:'Irrelevant image',
+    MARKED_OK_BUT_DEFECT:'Marked OK — defect visible',
+    MARKED_NOTOK_BUT_FINE:'Marked Not OK — looks fine', PHOTO_QUALITY:'Poor photo quality',
   };
 
-  document.getElementById('valBody').innerHTML = state.results.map(r => {
-    const item = state.parsedItems.find(i => i.num === r.row) || {};
+  document.getElementById('modalBody').innerHTML = results.map(r => {
+    const item = parsedItems.find(i => i.num === r.row) || {};
     const photoChecksHtml = !(r.metaList?.length)
-      ? `<span style="color:var(--gray);font-size:12px">no photos</span>`
+      ? `<span style="color:var(--gray);font-size:11px">no photos</span>`
       : r.metaList.map(m => `
-          <div style="margin-bottom:6px;padding:5px 7px;background:#f7fafc;border-radius:6px;border:1px solid #e2e8f0">
-            <div style="font-size:10px;color:var(--gray);margin-bottom:3px;font-weight:600">${m.name}</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:${m.dateOk===true?'#f0fff4':m.dateOk===false?'#fff0f0':'#f7fafc'};color:${m.dateOk===true?'#1a7a45':m.dateOk===false?'#8b0000':'#718096'}">${m.dateOk===true?'✓':m.dateOk===false?'✗':'?'} ${m.dateLabel}</span>
-              <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:${m.gpsOk===true?'#f0fff4':m.gpsOk===false?'#fff0f0':'#f7fafc'};color:${m.gpsOk===true?'#1a7a45':m.gpsOk===false?'#8b0000':'#718096'}">${m.gpsOk===true?'✓':m.gpsOk===false?'✗':'?'} ${m.gpsLabel}</span>
+          <div style="margin-bottom:5px;padding:5px 7px;background:var(--surface);border-radius:6px;border:0.5px solid var(--border)">
+            <div style="font-size:10px;color:var(--gray);margin-bottom:3px;font-weight:500">${escHtml(m.name)}</div>
+            <div>
+              <span class="meta-pill ${m.dateOk===true?'meta-ok':m.dateOk===false?'meta-fail':'meta-na'}">${m.dateOk===true?'✓':m.dateOk===false?'✗':'?'} ${escHtml(m.dateLabel)}</span>
+              <span class="meta-pill ${m.gpsOk===true?'meta-ok':m.gpsOk===false?'meta-fail':'meta-na'}">${m.gpsOk===true?'✓':m.gpsOk===false?'✗':'?'} ${escHtml(m.gpsLabel)}</span>
             </div>
           </div>`).join('');
-    const causesHtml = (r.causes||[]).map(c=>`<div style="color:red;font-size:11px;font-weight:bold;margin-bottom:2px">${causeLabels[c]||c}</div>`).join('');
+    const causesHtml = (r.causes||[]).map(c => `<span class="cause-tag">${causeLabels[c]||c}</span>`).join('');
+    let statusMatch = '—';
+    let statusClass = 'meta-na';
+    
+    const pdfOk =
+      (item.result || '').toUpperCase() === 'OK';
+    
+    const aiConfirmed =
+      r.verdict === 'CONFIRMED';
+    
+    if (
+      r.verdict !== 'NO_EVIDENCE'
+    ) {
+    
+      const matched =
+        (pdfOk && aiConfirmed) ||
+        (!pdfOk && !aiConfirmed);
+    
+      statusMatch =
+        matched
+          ? '✓ Correct'
+          : '✗ Incorrect';
+    
+      statusClass =
+        matched
+          ? 'meta-ok'
+          : 'meta-fail';
+    }  
+    const vclass = r.verdict==='CONFIRMED'?'vb-confirmed':r.verdict==='DISPUTED'?'vb-disputed':'vb-no-ev';
     return `<tr>
-      <td>${r.row}</td><td>${item.desc||''}</td><td>${photoChecksHtml}</td>
-      <td>${item.result||''}</td>
-      <td><span class="vbadge ${r.verdict==='CONFIRMED'?'vb-confirmed':'vb-disputed'}">${r.verdict}</span></td>
-      <td>${causesHtml}<div style="font-size:12px;color:#2d3748;margin-top:${causesHtml?'4px':'0'}">${r.explanation}</div></td>
+      <td style="color:var(--gray)">${r.row}</td>
+      <td style="font-size:11px;line-height:1.5;direction:rtl;text-align:right;font-family:'Tahoma',sans-serif">${escHtml(item.desc||'')}</td>
+      <td>${photoChecksHtml}</td>
+        <td>
+          <span style="font-size:11px">
+            ${escHtml((item.result||'').replace('_',' '))}
+          </span>
+        </td>
+        
+        <td>
+          <span class="meta-pill ${statusClass}">
+            ${statusMatch}
+          </span>
+        </td>
+        
+        <td>
+          <span class="vbadge ${vclass}">
+            ${r.verdict}
+          </span>
+        </td>
+      <td>
+        ${causesHtml?`<div style="margin-bottom:4px">${causesHtml}</div>`:''}
+        <div style="font-size:11px;color:#2d3748;line-height:1.5">${escHtml(r.explanation||'')}</div>
+      </td>
     </tr>`;
   }).join('');
+
+  document.getElementById('modalOverlay').classList.add('open');
 }
 
-/* ══════════════════════════════════════════════
-   UTILITIES
-══════════════════════════════════════════════ */
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+/* ══ UTILITIES ══ */
+
+
 async function callLLM(content) {
-  const res  = await fetch(LLM_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:LLM_MODEL, messages:[{role:'user',content}]}) });
+
+  const res = await fetch(LLM_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:LLM_MODEL,
+      messages:[{
+        role:'user',
+        content
+      }]
+    })
+  });
+
   const data = await res.json();
+
+  console.log("LLM RAW RESPONSE:", data);
+
+  if (!data.choices || !data.choices.length) {
+
+    console.error("Bad LLM response:", data);
+
+    throw new Error(
+      "Invalid LLM response: " +
+      JSON.stringify(data)
+    );
+  }
+
   return data.choices[0].message.content;
 }
 
-function haversine(lat1,lon1,lat2,lon2) {
-  const R=6371000, φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180;
-  const Δφ=(lat2-lat1)*Math.PI/180, Δλ=(lon2-lon1)*Math.PI/180;
+    
+function haversine(lat1, lon1, lat2, lon2) {
+  const R=6371000, φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180, Δφ=(lat2-lat1)*Math.PI/180, Δλ=(lon2-lon1)*Math.PI/180;
   const a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-function setProgress(pct,msg) { document.getElementById('progressFill').style.width=pct+'%'; document.getElementById('progressMsg').innerText=msg; }
-function setStep(n) { for(let i=1;i<=5;i++){document.getElementById(`step${i}-ind`).className=`step ${i<n?'done':i===n?'active':''}`;const d=document.getElementById(`div${i}`);if(d)d.className=`step-divider ${i<n?'done':''}`; } }
-function show(id) { document.getElementById(id).classList.remove('hidden'); }
-function hide(id) { document.getElementById(id).classList.add('hidden'); }
+function escHtml(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 async function loadTaskRules() {
   try { TASK_RULES = await (await fetch('task_rules.json')).json(); } catch { TASK_RULES = {}; }
