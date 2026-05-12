@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+python-multipart
+python-jose[cryptography]
+bcrypt
+pydantic-settings
+minio
+pymupdf
+requests
+pillow
+reportlab
