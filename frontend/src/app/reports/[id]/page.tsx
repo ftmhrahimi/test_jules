@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { ChevronLeft, Download, MapPin, Calendar, CheckCircle2, XCircle, Info, Maximize2, Globe } from 'lucide-react';
 import Link from 'next/link';
+import { getApiUrl, getMinioUrl } from '../../utils';
 
 export default function ReportDetail() {
   const params = useParams();
@@ -18,9 +19,10 @@ export default function ReportDetail() {
   }, [id]);
 
   const fetchReport = async () => {
+    const apiUrl = getApiUrl();
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}`, {
+      const res = await axios.get(`${apiUrl}/reports/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReport(res.data);
@@ -34,9 +36,10 @@ export default function ReportDetail() {
   };
 
   const handleDownload = async () => {
+     const apiUrl = getApiUrl();
      try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/export`, {
+      const res = await axios.get(`${apiUrl}/reports/${id}/export`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
@@ -125,7 +128,7 @@ export default function ReportDetail() {
                                 <div className="grid grid-cols-2 gap-2">
                                     {item.photos.map((photo: any) => (
                                         <div key={photo.name} className="relative group cursor-pointer" onClick={() => setSelectedPhoto(photo.url)}>
-                                            <img src={`${process.env.NEXT_PUBLIC_MINIO_URL}/${photo.url}`} className="w-full h-16 object-cover rounded-lg border border-gray-100" />
+                                            <img src={`${getMinioUrl()}/${photo.url}`} className="w-full h-16 object-cover rounded-lg border border-gray-100" />
                                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center">
                                                 <Maximize2 className="text-white" size={16} />
                                             </div>
@@ -158,7 +161,7 @@ export default function ReportDetail() {
 
       {selectedPhoto && (
           <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setSelectedPhoto(null)}>
-              <img src={`${process.env.NEXT_PUBLIC_MINIO_URL}/${selectedPhoto}`} className="max-w-full max-h-full rounded-lg shadow-2xl" />
+              <img src={`${getMinioUrl()}/${selectedPhoto}`} className="max-w-full max-h-full rounded-lg shadow-2xl" />
               <button className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full">✕</button>
           </div>
       )}

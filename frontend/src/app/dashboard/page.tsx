@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FileUp, FileText, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { getApiUrl } from '../utils';
 
 export default function Dashboard() {
   const [reports, setReports] = useState<any[]>([]);
@@ -15,9 +16,10 @@ export default function Dashboard() {
   }, []);
 
   const fetchReports = async () => {
+    const apiUrl = getApiUrl();
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports`, {
+      const res = await axios.get(`${apiUrl}/reports`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReports(res.data);
@@ -34,11 +36,12 @@ export default function Dashboard() {
     setUploading(true);
     const token = localStorage.getItem('token');
 
+    const apiUrl = getApiUrl();
     for (let i = 0; i < files.length; i++) {
       const formData = new FormData();
       formData.append('file', files[i]);
       try {
-        await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/process-pdf`, formData, {
+        await axios.post(`${apiUrl}/process-pdf`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'

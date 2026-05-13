@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
+import { getApiUrl } from './utils';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -10,11 +11,12 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const apiUrl = getApiUrl();
     try {
       const params = new URLSearchParams();
       params.append('username', username);
       params.append('password', password);
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/login`, params);
+      const res = await axios.post(`${apiUrl}/login`, params);
       localStorage.setItem('token', res.data.access_token);
       window.location.href = '/dashboard';
     } catch (err) {
@@ -35,6 +37,7 @@ export default function LoginPage() {
               className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
               required
             />
           </div>
@@ -45,6 +48,7 @@ export default function LoginPage() {
               className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gold"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               required
             />
           </div>

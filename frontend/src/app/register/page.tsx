@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import { getApiUrl } from '../utils';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -12,8 +13,9 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    const apiUrl = getApiUrl();
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/register`, {
+      await axios.post(`${apiUrl}/register`, {
         username,
         password
       });
@@ -45,6 +47,7 @@ export default function RegisterPage() {
                 className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
                 required
               />
             </div>
@@ -55,6 +58,7 @@ export default function RegisterPage() {
                 className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
                 required
               />
             </div>
