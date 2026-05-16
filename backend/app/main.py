@@ -4,10 +4,9 @@ from app.api.endpoints import router
 from app.core.database import engine
 from app.models import models
 
-models.Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="PM Report Validator API")
 
+# Permissive CORS for production/offline environment
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,6 +14,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+def on_startup():
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Database connection error: {e}")
 
 app.include_router(router)
 
