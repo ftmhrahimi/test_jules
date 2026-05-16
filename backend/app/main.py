@@ -23,6 +23,20 @@ def on_startup():
     try:
         models.Base.metadata.create_all(bind=engine)
         print("Database tables verified/created.")
+
+        # Create default user for testing
+        from app.core.database import SessionLocal
+        from app.core.auth import get_password_hash
+        db = SessionLocal()
+        if not db.query(models.User).filter(models.User.username == "admin").first():
+            admin_user = models.User(
+                username="admin",
+                hashed_password=get_password_hash("admin@1234")
+            )
+            db.add(admin_user)
+            db.commit()
+            print("Default user 'admin' created.")
+        db.close()
     except Exception as e:
         print(f"Database connection error: {e}")
 
